@@ -8,7 +8,7 @@ requires-python = ">=3.9"
 dependencies = ["typer", "rich", "ipython","redis","lxml","aioredis","aiohttp","httpx"]
 
 [project.scripts]
-cola = "cola.cmdline:app"
+cola = "cola.src.cmdline:app --help"
 
 
 [build-system]

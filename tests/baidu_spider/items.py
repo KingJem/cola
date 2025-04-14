@@ -1,5 +1,5 @@
-from bald_spider.items import Field
-from bald_spider import Item
+from src.items import Field
+from src import Item
 
 
 class BaiduItem(Item):
