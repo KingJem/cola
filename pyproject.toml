@@ -1,20 +1,16 @@
-[tool.poetry]
+[project]
 name = "cola"
 version = "0.1.0"
-description = ""
-authors = ["KingJem <qqqqivy@gmail.com>"]
-license = "MIT"
+description = "A modern asynchronous Python framework inspired by Scrapy."
+authors = [{ name = "KingJem", email = "qqqqivy@gmail.com" }]
 readme = "README.md"
+requires-python = ">=3.9"
+dependencies = ["typer", "rich", "ipython","redis","lxml","aioredis","aiohttp","httpx"]
 
-[tool.poetry.dependencies]
-python = "^3.9"
-redis = "^5.2.1"
-lxml = "^5.3.2"
-aioredis = "^2.0.1"
-aiohttp = "^3.11.16"
-httpx = "^0.28.1"
+[project.scripts]
+cola = "cola.cmdline:app"
 
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
