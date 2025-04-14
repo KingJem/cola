@@ -12,8 +12,8 @@ async def run():
     # srp 单一职责原则，single responsibility principle
     settings = get_settings()
     process = CrawlerProcess(settings)
-    await process.crawl(LawSpider)
-    # await process.crawl(BaiduSpider2)
+    # await process.crawl(LawSpider)
+    await process.crawl(BaiduSpider2)
     await process.start()
 
 asyncio.run(run())

@@ -24,6 +24,7 @@ class BaiduSpider(Spider):
             yield request
 
     def parse_page(self, response):
+        response.xpath("//div[@class='pagination']/ul/li").getall()
         for i in range(2):
             url = "http://www.baidu.com"
             request = Request(url=url, callback=self.parse_detail, dont_filter=True)

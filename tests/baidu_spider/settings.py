@@ -13,7 +13,7 @@ MIDDLEWARES = [
     "bald_spider.middleware.default_header.DefaultHeader",
     "bald_spider.middleware.response_filter.ResponseFilter",
     "bald_spider.middleware.retry.Retry",
-    "baidu_spider.middleware.ProxyMiddleware",
+    # "baidu_spider.middleware.ProxyMiddleware",
     "bald_spider.middleware.response_code.ResponseCodeStats",
     "bald_spider.middleware.request_ignore.RequestIgnore",
 
@@ -29,7 +29,7 @@ EXTENSIONS = [
 PIPELINES = [
     # "baidu_spider.pipeline.TestPipeline",
     # "bald_spider.pipeline.debug_pipeline.DebugPipeline",
-    "baidu_spider.pipeline.LayPipeline",
+    # "baidu_spider.pipeline.LayPipeline",
 ]
 
 DOWNLOAD_DELAY = 1
