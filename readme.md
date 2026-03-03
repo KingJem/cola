@@ -10,18 +10,58 @@
 - 📊 **统计收集** - 内置性能监控
 - 🔄 **智能调度** - 基于优先级的请求队列
 - 🛡️ **错误处理** - 完善的异常处理机制
+- 🖥️ **CLI 工具** - 命令行创建项目和爬虫
 
 ## 🚀 快速开始
 
-### 安装依赖
+### 安装
 
 ```bash
+# 克隆仓库
+git clone <repository-url>
+cd cola
+
+# 安装依赖 (使用 uv)
 uv sync
+
+# 或使用 pip
+pip install -e .
 ```
 
-> **注意**: 本项目已从 Poetry 迁移到 uv。如需了解详情，请查看 [迁移指南](MIGRATION_TO_UV.md)。
+### 使用 CLI 创建项目
 
-### 创建第一个爬虫
+Cola 提供了类似 Scrapy 的 CLI 工具，可以快速创建项目和管理爬虫：
+
+```bash
+# 创建新项目
+cola startproject myproject
+cd myproject
+
+# 创建新爬虫
+cola genspider example example.com
+
+# 列出所有爬虫
+cola list
+
+# 运行爬虫
+cola crawl example
+
+# 指定并发数和日志级别
+cola crawl example -c 10 -l DEBUG
+```
+
+### CLI 命令参考
+
+| 命令 | 说明 | 示例 |
+|------|------|------|
+| `cola startproject <name>` | 创建新项目 | `cola startproject myproject` |
+| `cola genspider <name> <domain>` | 创建新爬虫 | `cola genspider baidu baidu.com` |
+| `cola crawl <name>` | 运行爬虫 | `cola crawl baidu` |
+| `cola list` | 列出所有爬虫 | `cola list` |
+
+### 手动创建爬虫
+
+如果不使用 CLI，也可以手动创建爬虫：
 
 ```python
 from src.spiders import Spider
@@ -35,7 +75,7 @@ class MySpider(Spider):
         print(f"标题: {title}")
 ```
 
-### 运行爬虫
+### 运行爬虫（代码方式）
 
 ```python
 import asyncio
@@ -87,9 +127,27 @@ class MySpider(Spider):
 
 ## 🏗️ 项目结构
 
+使用 CLI 创建的项目结构：
+
+```
+myproject/
+├── cola.py           # 项目 CLI 工具
+├── settings.py       # 项目配置
+├── README.md         # 项目说明
+├── spiders/          # 爬虫目录
+│   ├── __init__.py
+│   └── example.py    # 生成的爬虫
+├── items/            # Item 定义
+├── middlewares/      # 中间件
+└── pipelines/        # 数据管道
+```
+
+框架源代码结构：
+
 ```
 cola/
 ├── src/                    # 源代码
+│   ├── commands/          # CLI 工具
 │   ├── core/              # 核心引擎和调度器
 │   ├── http/              # Request和Response
 │   ├── spiders/           # Spider基类
