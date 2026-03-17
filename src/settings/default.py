@@ -17,3 +17,16 @@ TIMEOUT = 30
 MAX_RETRY = 3
 
 LOG_LEVEL = 'INFO'
+
+DOWNLOADER_MIDDLEWARES = {}   # {class_path: priority}
+ITEM_PIPELINES = {}           # {class_path: priority}
+DUPEFILTER_CLASS = 'src.dupefilter.RFPDupeFilter'
+DUPEFILTER_DEBUG = False
+JSON_FEED_URI = 'output.jl'
+CSV_FEED_URI = 'output.csv'
+
+
+def get_default_settings() -> dict:
+    import sys
+    module = sys.modules[__name__]
+    return {k: getattr(module, k) for k in dir(module) if k.isupper()}
