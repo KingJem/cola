@@ -13,6 +13,7 @@ class Request:
                  proxy: dict = None,
                  body: str = None,
                  callback: Callable = None,
+                 dont_filter: bool = False,
                  ):
         self.url = url
         self.headers = headers
@@ -22,6 +23,7 @@ class Request:
         self.proxy = proxy
         self.body = body
         self.callback = callback
+        self.dont_filter = dont_filter
         self.meta = {}
 
     def __lt__(self, other):

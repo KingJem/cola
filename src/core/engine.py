@@ -25,6 +25,7 @@ class Engine:
         self.processor: Optional[Processor] = None
         self.running = False
         self.task_manager = TaskManager(self.settings)
+        self.dupe_filter = None
         self.logger = logger
 
     async def start_spider(self, spider):
@@ -37,6 +38,9 @@ class Engine:
         self.processor = Processor(self.crawler)
         self.downloader = self.get_downloader()
         self.start_requests = iter(spider.start_requests())
+        dupefilter_cls_path = self.settings.get('DUPEFILTER_CLASS', 'src.dupefilter.RFPDupeFilter')
+        dupefilter_cls = load_class(dupefilter_cls_path)
+        self.dupe_filter = dupefilter_cls.from_crawler(self.crawler)
         await self.open_spider()
 
     def get_downloader(self):
@@ -113,7 +117,11 @@ class Engine:
         await self._schedule_request(request)
 
     async def _schedule_request(self, request):
-        # todo 去重
+        if not request.dont_filter and self.dupe_filter.is_seen(request):
+            if self.dupe_filter.debug:
+                self.logger.debug(f"Filtered duplicate request: {request.url}")
+            return
+        self.dupe_filter.mark_seen(request)
         await self.scheduler.enqueue_request(request)
 
     async def _get_next_request(self):
@@ -151,6 +159,8 @@ class Engine:
         if self.task_manager.current_task:
             await asyncio.gather(*self.task_manager.current_task, return_exceptions=True)
         await self.__close(self.downloader)
+        if self.dupe_filter is not None:
+            self.dupe_filter.close()
         await self.crawler.close()
 
     @staticmethod
