@@ -17,6 +17,7 @@ class Crawler:
         self.engine: Optional[Engine] = None
         self.settings: SettingsManager = settings.copy()
         self.stat_collector: Optional[StatsCollector] = None
+        self.pipeline_manager = None
 
     def create_spider(self) -> Spider:
         spider = self.spider_cls.create_instance(self)
@@ -39,6 +40,9 @@ class Crawler:
             custom_settings = getattr(self.spider, 'custom_settings', {})
             self.settings.update(custom_settings)
         self.stat_collector = self.create_stat_collector()
+        from src.pipeline import PipelineManager
+        self.pipeline_manager = PipelineManager(self)
+        await self.pipeline_manager.open_spider(self.spider)
         await self.engine.start_spider(self.spider)
 
     def _set_spider(self):
@@ -50,6 +54,8 @@ class Crawler:
             self.settings.update_values(custom_settings)
 
     async def close(self, reason='finished'):
+        if self.pipeline_manager:
+            await self.pipeline_manager.close_spider(self.spider)
         self.stat_collector['end_time'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         self.stat_collector.close_spider(self.spider, reason)
 
