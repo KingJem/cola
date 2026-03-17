@@ -28,6 +28,13 @@ class QuotesSpider(Spider):
         'CONCURRENT_REQUESTS': 3,  # 并发数设置为3
         'TIMEOUT': 30,
         'PROJECT_NAME': 'quotes_demo',
+        # Item Pipeline 配置（数字为优先级，升序执行）
+        'ITEM_PIPELINES': {
+            'src.pipeline.console.ConsolePipeline': 100,
+            'src.pipeline.json_pipeline.JsonPipeline': 800,
+        },
+        'JSON_FEED_URI': 'quotes_output.jl',
+        'DUPEFILTER_DEBUG': True,
     }
     
     async def parse(self, response: Response):
