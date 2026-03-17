@@ -26,6 +26,7 @@ class Engine:
         self.running = False
         self.task_manager = TaskManager(self.settings)
         self.dupe_filter = None
+        self.middleware_manager = None
         self.logger = logger
 
     async def start_spider(self, spider):
@@ -41,6 +42,8 @@ class Engine:
         dupefilter_cls_path = self.settings.get('DUPEFILTER_CLASS', 'src.dupefilter.RFPDupeFilter')
         dupefilter_cls = load_class(dupefilter_cls_path)
         self.dupe_filter = dupefilter_cls.from_crawler(self.crawler)
+        from src.middlewares import MiddlewareManager
+        self.middleware_manager = MiddlewareManager(self.crawler)
         await self.open_spider()
 
     def get_downloader(self):
@@ -96,22 +99,42 @@ class Engine:
         else:
             raise Exception('TypeError')
 
-    async def _fetch(self, request) -> [Generator, AsyncGenerator]:
-        async def _success(_response):
-            callback: Callable = request.callback or self.spider.parse
-            _outputs = callback(_response)
-            if _outputs:
-                if inspect.iscoroutine(_outputs):
-                    await _outputs
-                else:
-                    return self._transform(_outputs)
+    async def _fetch(self, request):
+        # 1. 中间件 process_request 链
+        result = await self.middleware_manager.process_request(request, self.spider)
 
-        _response = await self.downloader.fetch(request)
-        if _response is None:
-            logger.warning(f"Download failed for {request.url}, skipping")
+        from src.http.response import Response as HttpResponse
+        if isinstance(result, HttpResponse):
+            response = result  # 中间件短路返回了 Response
+        else:
+            if isinstance(result, Request):
+                request = result  # 中间件返回了修改后的 Request
+            # 2. 实际下载
+            try:
+                response = await self.downloader.fetch(request)
+                if response is None:
+                    logger.warning(f"Download failed for {request.url}, skipping")
+                    return None
+            except Exception as e:
+                # 3a. 中间件 process_exception 链
+                exc_result = await self.middleware_manager.process_exception(request, e, self.spider)
+                if exc_result is None:
+                    logger.error(f"Unhandled download exception for {request.url}: {e}")
+                    return None
+                response = exc_result
+
+        # 3b. 中间件 process_response 链
+        response = await self.middleware_manager.process_response(request, response, self.spider)
+
+        # 4. 调用 spider callback
+        callback = request.callback or self.spider.parse
+        outputs = callback(response)
+        if outputs is None:
             return None
-        outputs = await _success(_response)
-        return outputs
+        if inspect.iscoroutine(outputs):
+            await outputs
+            return None
+        return self._transform(outputs)
 
     async def enqueue_requests(self, request):
         await self._schedule_request(request)
@@ -133,13 +156,12 @@ class Engine:
             if isinstance(output, Request):
                 await self.processor.enqueue(output)
             elif isinstance(output, MutableMapping) and hasattr(output, 'FIELDS'):
-                # item 实例检查（通过MutableMapping基类和FIELDS属性来判断）
+                # Item 实例（通过 MutableMapping 基类和 FIELDS 属性判断）
                 await self.processor.enqueue(output)
             elif isinstance(output, dict):
-                # 支持直接返回字典
-                logger.debug(f"Spider yielded dict: {output}")
+                # dict 也送入 Processor -> Pipeline 处理
+                await self.processor.enqueue(output)
             else:
-                # 其他类型也记录但不抛出异常
                 logger.warning(f"Spider yielded unsupported type {type(output)}: {output}")
 
     def _exit(self):

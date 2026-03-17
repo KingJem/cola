@@ -1,51 +1,110 @@
-from pprint import pformat
-from collections import defaultdict 
+"""
+下载中间件管理器。
 
-import loguru
+中间件配置（DOWNLOADER_MIDDLEWARES）格式：
+    {
+        'path.to.MyMiddleware': 100,
+        'path.to.OtherMiddleware': 200,
+    }
+数字为优先级（升序），process_request 按升序执行，process_response 按降序执行。
 
-from src.exceptions import MiddlewareException
+中间件接口（方法均为可选）：
+    process_request(request, spider)           -> None | Request | Response
+    process_response(request, response, spider) -> Response | Request
+    process_exception(request, exception, spider) -> None | Response | Request
+"""
+import asyncio
+import inspect
+from typing import Optional
+
+from loguru import logger
+
+from src.utils import load_class
+
+
+async def _call_maybe_async(method, *args):
+    """统一调用同步或异步方法"""
+    if inspect.iscoroutinefunction(method):
+        return await method(*args)
+    else:
+        return method(*args)
 
 
 class MiddlewareManager:
+
     def __init__(self, crawler):
         self.crawler = crawler
-        self.logger = loguru.logger
         self.middlewares = []
-        self.method = defaultdict(list)
-        self.load_middlewares()
-        self.add_method()
+        self._methods = {
+            'process_request': [],
+            'process_response': [],
+            'process_exception': [],
+        }
+        self._load()
 
     @classmethod
-    def create_instance(cls, crawler, *args, **kwargs):
+    def create_instance(cls, crawler):
         return cls(crawler)
 
-    def load_middlewares(self):
-        middlewares = self.crawler.settings.getlist('MIDDLEWARES')
-        enable_middlewares = [i for i in middlewares if self.validate_middleware(i)]
+    def _load(self):
+        setting = self.crawler.settings.get('DOWNLOADER_MIDDLEWARES', {})
+        if not setting:
+            return
 
-        if enable_middlewares:
-            self.logger.info(f"Enabled middlewares: \n" + pformat(enable_middlewares))
+        sorted_mws = sorted(setting.items(), key=lambda x: x[1])
+        enabled = []
+        for class_path, priority in sorted_mws:
+            try:
+                cls = load_class(class_path)
+                if hasattr(cls, 'create_instance'):
+                    instance = cls.create_instance(self.crawler)
+                else:
+                    instance = cls()
+                self.middlewares.append(instance)
+                enabled.append(f"  {priority:4d} {class_path}")
 
-    def validate_middleware(self, middleware):
-        middleware_cls = self.crawler.utils.load_class(middleware)
-        if not hasattr(middleware_cls, 'create_instance'):
-            raise MiddlewareException(f"Middleware {middleware_cls} does not have create_instance method")
+                # 只注册存在的方法（不强制全部有）
+                for method_name in ('process_request', 'process_response', 'process_exception'):
+                    if hasattr(instance, method_name):
+                        self._methods[method_name].append(getattr(instance, method_name))
 
-        instance = middleware_cls.create_instance()
-        self.middlewares.append(instance)
-        return True
+            except Exception as e:
+                logger.error(f"Failed to load middleware {class_path}: {e}")
 
-    def add_method(self):
-        for middleware in self.middlewares:
-            for method in ['process_request','process_response','process_exception']:
-                self._add_method(middleware,method)
+        if enabled:
+            logger.info("Enabled downloader middlewares:\n" + "\n".join(enabled))
 
-    def _add_method(self,middleware,name:str):
-        if hasattr(middleware, name):
-            self.method[name].append(getattr(middleware, name))
-        else:
-            raise MiddlewareException(f"Middleware {middleware} does not have {name} method")
+    async def process_request(self, request, spider):
+        """
+        按优先级顺序执行 process_request。
+        - 返回 None：继续下一个中间件
+        - 返回 Request：用新请求继续链（修改后的请求）
+        - 返回 Response：短路，直接进入 process_response（跳过下载）
+        """
+        for method in self._methods['process_request']:
+            result = await _call_maybe_async(method, request, spider)
+            if result is not None:
+                return result  # 短路：Response 或新 Request
+        return request
 
-    def validate_method(self,method):
-        if not hasattr(self, method):
-            raise MiddlewareException(f"MiddlewareManager does not have {method} method")
+    async def process_response(self, request, response, spider):
+        """
+        按优先级逆序执行 process_response。
+        - 返回 Response：继续下一个中间件
+        - 返回 Request：重新入队下载
+        """
+        for method in reversed(self._methods['process_response']):
+            response = await _call_maybe_async(method, request, response, spider)
+        return response
+
+    async def process_exception(self, request, exception, spider):
+        """
+        下载发生异常时按顺序执行。
+        - 返回 None：继续下一个中间件（异常继续传播）
+        - 返回 Response 或 Request：停止异常传播
+        """
+        for method in self._methods['process_exception']:
+            result = await _call_maybe_async(method, request, exception, spider)
+            if result is not None:
+                return result
+        return None
