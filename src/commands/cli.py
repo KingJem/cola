@@ -485,6 +485,105 @@ def list_spiders(project_dir: str = None):
     return True
 
 
+def cmd_fetch(args):
+    """使用 cola 下载器直接获取 URL"""
+    import asyncio
+    from src.http.request import Request
+    from src.http.response import Response
+    from src.settings.settings_manager import SettingsManager
+    from src.downloaders.aio_http_downloader import AioHttpDownloader
+    
+    url = args.url
+    method = args.method.upper() if args.method else 'GET'
+    headers = {}
+    if args.headers:
+        for h in args.headers:
+            if ':' in h:
+                key, value = h.split(':', 1)
+                headers[key.strip()] = value.strip()
+    
+    request = Request(
+        url=url,
+        method=method,
+        headers=headers if headers else None
+    )
+    
+    class MockCrawler:
+        def __init__(self, settings):
+            self.settings = settings
+            self.spider = None
+            self.stat_collector = None
+            self.pipeline_manager = None
+    
+    settings = SettingsManager({})
+    crawler = MockCrawler(settings)
+    
+    async def run():
+        downloader = AioHttpDownloader(crawler)
+        downloader.open()
+        try:
+            response = await downloader.fetch(request)
+            if response:
+                print(f"[{response.status_code}] {response.url}")
+                print("-" * 60)
+                print(response.text[:args.limit] if args.limit > 0 else response.text)
+                return 0
+            else:
+                print(f"Failed to fetch: {url}")
+                return 1
+        finally:
+            await downloader.close()
+    
+    return asyncio.run(run())
+
+
+def cmd_version(args):
+    """显示 Cola 版本信息"""
+    try:
+        import src
+        cola_version = getattr(src, '__version__', 'unknown')
+    except ImportError:
+        cola_version = "unknown"
+    
+    print(f"Cola {cola_version}")
+    print(f"Python: {sys.version}")
+    print(f"Platform: {sys.platform}")
+    
+    if args.verbose:
+        import aiohttp
+        import lxml
+        import loguru
+        print(f"aiohttp: {aiohttp.__version__}")
+        print(f"lxml: {lxml.__version__}")
+        print(f"loguru: {loguru.__version__}")
+    
+    return 0
+
+
+def cmd_settings(args):
+    """获取设置值"""
+    from src.settings.settings_manager import SettingsManager
+    from src.settings.default import get_default_settings
+    
+    settings = SettingsManager(get_default_settings())
+    
+    if args.setting:
+        value = settings.get(args.setting)
+        if value is None:
+            print(f"Setting '{args.setting}' not found")
+            return 1
+        print(value)
+    else:
+        print("Current settings:")
+        print("-" * 40)
+        defaults = get_default_settings()
+        for key in sorted(defaults.keys()):
+            value = settings.get(key)
+            print(f"{key}: {value}")
+    
+    return 0
+
+
 def main():
     parser = argparse.ArgumentParser(
         prog='cola',
@@ -497,6 +596,9 @@ def main():
   cola genspider example example.com   # 创建爬虫
   cola crawl example                   # 运行爬虫
   cola list                            # 列出所有爬虫
+  cola fetch https://example.com       # 获取 URL
+  cola version                         # 显示版本
+  cola settings                        # 显示所有设置
         '''
     )
     
@@ -532,6 +634,30 @@ def main():
         help='列出所有爬虫'
     )
     
+    # fetch 命令
+    fetch_parser = subparsers.add_parser(
+        'fetch',
+        help='使用下载器获取 URL'
+    )
+    fetch_parser.add_argument('url', help='要获取的 URL')
+    fetch_parser.add_argument('-m', '--method', help='HTTP 方法 (GET, POST, etc.)')
+    fetch_parser.add_argument('-H', '--headers', action='append', help='HTTP 头 (key:value)')
+    fetch_parser.add_argument('-L', '--limit', type=int, default=0, help='限制输出字符数 (0=无限制)')
+    
+    # version 命令
+    version_parser = subparsers.add_parser(
+        'version',
+        help='显示版本信息'
+    )
+    version_parser.add_argument('-v', '--verbose', action='store_true', help='显示详细版本信息')
+    
+    # settings 命令
+    settings_parser = subparsers.add_parser(
+        'settings',
+        help='获取设置值'
+    )
+    settings_parser.add_argument('setting', nargs='?', help='设置项名称')
+    
     args = parser.parse_args()
     
     if args.command == 'startproject':
@@ -542,6 +668,12 @@ def main():
         run_crawl(args.spider, concurrent=args.concurrent, log_level=args.log_level)
     elif args.command == 'list':
         list_spiders()
+    elif args.command == 'fetch':
+        cmd_fetch(args)
+    elif args.command == 'version':
+        cmd_version(args)
+    elif args.command == 'settings':
+        cmd_settings(args)
     else:
         parser.print_help()
 
