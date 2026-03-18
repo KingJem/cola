@@ -584,6 +584,118 @@ def cmd_settings(args):
     return 0
 
 
+def cmd_bench(args):
+    """运行快速基准测试"""
+    import time
+    import asyncio
+    from src.http.request import Request
+    from src.http.response import Response
+    from src.settings.settings_manager import SettingsManager
+    from src.downloaders.aio_http_downloader import AioHttpDownloader
+    from src.stats_collector import StatsCollector
+    from datetime import datetime
+    
+    concurrent = args.concurrent
+    total_requests = args.requests
+    test_url = 'https://httpbin.org/get'
+    
+    class BenchCrawler:
+        def __init__(self, settings):
+            self.settings = settings
+            self.spider = None
+            self.stat_collector = StatsCollector(settings)
+            self.pipeline_manager = None
+    
+    settings = SettingsManager({
+        'CONCURRENT_REQUESTS': concurrent,
+    })
+    crawler = BenchCrawler(settings)
+    crawler.stat_collector['start_time'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    
+    print(f"Cola Benchmark")
+    print(f"=" * 60)
+    print(f"Target URL: {test_url}")
+    print(f"Concurrent requests: {concurrent}")
+    print(f"Total requests: {total_requests}")
+    print(f"")
+    print(f"Running benchmark...")
+    print(f"")
+    
+    async def run():
+        downloader = AioHttpDownloader(crawler)
+        downloader.open()
+        
+        semaphore = asyncio.Semaphore(concurrent)
+        latencies = []
+        errors = 0
+        start_time = time.time()
+        
+        async def fetch_one(url):
+            nonlocal errors
+            req = Request(url=url)
+            t0 = time.time()
+            try:
+                resp = await downloader.fetch(req)
+                latency = time.time() - t0
+                latencies.append(latency)
+                if resp:
+                    crawler.stat_collector.inc_value('response_count', 1)
+                else:
+                    errors += 1
+            except Exception:
+                errors += 1
+                crawler.stat_collector.inc_value('error_count', 1)
+            finally:
+                semaphore.release()
+        
+        tasks = []
+        for i in range(total_requests):
+            await semaphore.acquire()
+            task = asyncio.create_task(fetch_one(test_url))
+            tasks.append(task)
+        
+        await asyncio.gather(*tasks, return_exceptions=True)
+        elapsed = time.time() - start_time
+        
+        await downloader.close()
+        return elapsed, latencies, errors
+    
+    elapsed, latencies, errors = asyncio.run(run())
+    
+    crawler.stat_collector['end_time'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    
+    success = len(latencies)
+    if latencies:
+        latencies.sort()
+        avg_lat = sum(latencies) / len(latencies)
+        min_lat = latencies[0]
+        max_lat = latencies[-1]
+        p50_lat = latencies[len(latencies) // 2]
+        p95_lat = latencies[int(len(latencies) * 0.95)]
+        p99_lat = latencies[int(len(latencies) * 0.99)]
+    
+    print(f"=" * 60)
+    print(f"Benchmark Results")
+    print(f"-" * 60)
+    print(f"Total time:       {elapsed:.3f}s")
+    print(f"Requests made:    {total_requests}")
+    print(f"Successful:      {success}")
+    print(f"Errors:          {errors}")
+    print(f"Req/sec:         {total_requests / elapsed:.2f}")
+    if latencies:
+        print(f"")
+        print(f"Latency (seconds):")
+        print(f"  avg:    {avg_lat:.3f}s")
+        print(f"  min:    {min_lat:.3f}s")
+        print(f"  max:    {max_lat:.3f}s")
+        print(f"  p50:    {p50_lat:.3f}s")
+        print(f"  p95:    {p95_lat:.3f}s")
+        print(f"  p99:    {p99_lat:.3f}s")
+    print(f"=" * 60)
+    
+    return 0
+
+
 def main():
     parser = argparse.ArgumentParser(
         prog='cola',
@@ -658,6 +770,14 @@ def main():
     )
     settings_parser.add_argument('setting', nargs='?', help='设置项名称')
     
+    # bench 命令
+    bench_parser = subparsers.add_parser(
+        'bench',
+        help='运行快速基准测试'
+    )
+    bench_parser.add_argument('--concurrent', type=int, default=16, help='并发请求数 (默认: 16)')
+    bench_parser.add_argument('--requests', type=int, default=100, help='总请求数 (默认: 100)')
+    
     args = parser.parse_args()
     
     if args.command == 'startproject':
@@ -674,6 +794,8 @@ def main():
         cmd_version(args)
     elif args.command == 'settings':
         cmd_settings(args)
+    elif args.command == 'bench':
+        cmd_bench(args)
     else:
         parser.print_help()
 
