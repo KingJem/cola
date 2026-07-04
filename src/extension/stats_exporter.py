@@ -1,17 +1,17 @@
-"""StatsExporter:周期性把爬虫运行指标快照导出,供外部(colad)观测。
+"""StatsExporter:周期性把爬虫运行指标快照导出,供外部(colad/Grafana)观测。
 
-与 HotConfig 对称——一个订阅 Redis 收配置,一个周期 push 指标。快照写到:
-- STATS_EXPORT_FILE:每周期 append 一行 JSON(colad 单机任务读此文件)
-- Redis(可选):SET {PROJECT_NAME}:stats:{NODE_NAME} 供 master 汇总多节点
+与 HotConfig 对称——一个订阅 Redis 收配置,一个周期 push 指标。导出后端可插拔
+(STATS_EXPORT_BACKENDS = file,redis,pushgateway,influxdb),见 stats_backends.py。
+Grafana 渲染:pushgateway/influxdb 直接对接;file/redis 由 colad 的 /metrics 端点
+转 Prometheus 供 pull。
 
 快照含累计量、窗口速率(pages/s、items/s)、队列深度、平均响应时间、成功率。
 启用:STATS_EXPORT_ENABLED = True(Crawler 自动挂载),或显式加入 EXTENSIONS。
 """
 import asyncio
-import json
-from pathlib import Path
 
 from src.event import spider_opened, spider_closed
+from src.extension.stats_backends import build_backends
 from src.utils.log import get_logger
 
 
@@ -25,19 +25,16 @@ class StatsExporter:
         self.file = self.settings.get('STATS_EXPORT_FILE')
         project = self.settings.get('PROJECT_NAME', 'cola')
         node = self.settings.get('NODE_NAME') or 'standalone'
+        self.project = project
+        self.node = node
         self.redis_key = (self.settings.get('STATS_EXPORT_REDIS_KEY')
                           or f'{project}:stats:{node}')
-        self.node = node
         self.task = None
-        self.redis = None
+        self.backends = []
         self._elapsed = 0.0
         self._last = {'responses': 0, 'items': 0}
         self.logger = get_logger(self.__class__.__name__,
                                  self.settings.get('LOG_LEVEL'))
-        if self.file:
-            Path(self.file).parent.mkdir(parents=True, exist_ok=True)
-            # 覆盖旧文件,避免重跑任务时历史串味
-            Path(self.file).write_text('', encoding='utf-8')
 
     @classmethod
     def create_instance(cls, crawler):
@@ -47,13 +44,21 @@ class StatsExporter:
         return o
 
     async def spider_opened(self):
-        if self.settings.get('STATS_EXPORT_REDIS_KEY') is not None \
-                or self.settings.get('NODE_ROLE', 'standalone') != 'standalone':
+        spider_name = self.crawler.spider.name if self.crawler.spider else ''
+        base_labels = {'node': self.node, 'project': self.project,
+                       'spider': spider_name}
+        self.backends = build_backends(
+            self.settings, file_path=self.file, redis_key=self.redis_key,
+            redis_ttl=int(self.interval * 4) + 10, base_labels=base_labels)
+        for backend in self.backends:
             try:
-                from src.distributed.connection import get_redis
-                self.redis = get_redis(self.settings, decode_responses=True)
+                await backend.open()
             except Exception as exc:
-                self.logger.warning(f'StatsExporter Redis 不可用: {exc}')
+                self.logger.warning(
+                    f'StatsExporter 后端 {type(backend).__name__} 打开失败: {exc}')
+        self.logger.info(
+            f'StatsExporter 后端: '
+            f'{[type(b).__name__ for b in self.backends]}')
         self.task = asyncio.create_task(self._loop())
 
     async def spider_closed(self):
@@ -62,11 +67,8 @@ class StatsExporter:
             await asyncio.gather(self.task, return_exceptions=True)
         # 收尾再导出一次终态快照
         await self._export(final=True)
-        if self.redis:
-            try:
-                await self.redis.aclose()
-            except Exception:
-                pass
+        for backend in self.backends:
+            await backend.close()
 
     async def _loop(self):
         try:
@@ -134,16 +136,9 @@ class StatsExporter:
 
     async def _export(self, final=False):
         snap = self.snapshot(final=final)
-        line = json.dumps(snap, ensure_ascii=False)
-        if self.file:
+        for backend in self.backends:
             try:
-                with open(self.file, 'a', encoding='utf-8') as fh:
-                    fh.write(line + '\n')
-            except OSError as exc:
-                self.logger.warning(f'StatsExporter 写文件失败: {exc}')
-        if self.redis:
-            try:
-                ttl = int(self.interval * 4) + 10
-                await self.redis.set(self.redis_key, line, ex=ttl)
+                await backend.export(snap)
             except Exception as exc:
-                self.logger.warning(f'StatsExporter 写 Redis 失败: {exc}')
+                self.logger.warning(
+                    f'StatsExporter 后端 {type(backend).__name__} 导出失败: {exc}')

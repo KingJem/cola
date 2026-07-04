@@ -58,6 +58,18 @@ STATS_EXPORT_REDIS_KEY = None      # 分布式聚合键;None -> '{PROJECT_NAME}:
 STATS_EXPORT_HISTORY = 720         # 内存/文件保留的历史点数(默认约 1 小时 @5s)
 NODE_NAME = None                   # 分布式节点名(worker/master 区分,复用于 stats 键)
 
+# 导出后端:逗号分隔或列表,可选 file / redis / pushgateway / influxdb。
+# 留空则按兼容规则推导(有 STATS_EXPORT_FILE 含 file,分布式含 redis)。
+STATS_EXPORT_BACKENDS = []
+STATS_METRIC_PREFIX = 'cola_'      # Prometheus 指标名前缀
+# Prometheus Pushgateway(短命任务用;pull 抓不到已退出进程)
+STATS_PUSHGATEWAY_URL = None       # 如 http://pushgateway:9091
+STATS_PUSHGATEWAY_JOB = 'cola'
+# InfluxDB v2 写入(line protocol)
+STATS_INFLUXDB_URL = None          # 如 http://influx:8086/api/v2/write?org=o&bucket=b&precision=s
+STATS_INFLUXDB_TOKEN = ''
+STATS_INFLUXDB_MEASUREMENT = 'cola_stats'
+
 # ---- 分布式(Redis 主从)----
 # 节点角色:standalone | master | worker
 NODE_ROLE = 'standalone'
