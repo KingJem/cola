@@ -28,8 +28,11 @@ class LogStats:
     async def request_scheduled(self, _request, _spider):
         self._stats.inc_value("request_scheduled_count")
 
-    async def response_received(self, _response, _spider):
+    async def response_received(self, response, _spider):
         self._stats.inc_value("response_received_count")
+        status = getattr(response, 'status_code', None)
+        if status is not None:
+            self._stats.inc_value(f"stats_code/count/{status}")
 
     async def item_successful(self, _item, _spider):
         self._stats.inc_value("item_successful_count")

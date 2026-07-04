@@ -1,3 +1,4 @@
+import time
 from asyncio import Semaphore
 from collections import defaultdict
 from typing import Optional
@@ -52,7 +53,19 @@ class AioHttpDownloader(Downloader):
 
     async def download(self, request: Request):
         logger.debug(f"Request downloading {request.url} method={request.method}")
-        return await self.send_request(request)
+        start = time.monotonic()
+        try:
+            return await self.send_request(request)
+        finally:
+            self._record_time(time.monotonic() - start)
+
+    def _record_time(self, elapsed: float):
+        stats = getattr(self.crawler, 'stat_collector', None)
+        if stats is None:
+            return
+        stats.inc_value('downloader/response_time_total', elapsed)
+        stats.inc_value('downloader/request_count')
+        stats.max_value('downloader/response_time_max', elapsed)
 
     @staticmethod
     def _resolve_proxy(proxy) -> Optional[str]:

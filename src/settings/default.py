@@ -50,6 +50,14 @@ CSV_FEED_URI = 'output.csv'
 
 EXTENSIONS = []
 
+# ---- 运行效率观测(StatsExporter 扩展)----
+STATS_EXPORT_ENABLED = False       # True 时自动挂载 StatsExporter
+STATS_EXPORT_INTERVAL = 5.0        # 采样周期(秒)
+STATS_EXPORT_FILE = None           # 快照 jsonl 文件;colad 启动任务时注入
+STATS_EXPORT_REDIS_KEY = None      # 分布式聚合键;None -> '{PROJECT_NAME}:stats:{NODE_NAME}'
+STATS_EXPORT_HISTORY = 720         # 内存/文件保留的历史点数(默认约 1 小时 @5s)
+NODE_NAME = None                   # 分布式节点名(worker/master 区分,复用于 stats 键)
+
 # ---- 分布式(Redis 主从)----
 # 节点角色:standalone | master | worker
 NODE_ROLE = 'standalone'

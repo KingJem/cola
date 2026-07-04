@@ -12,6 +12,8 @@ from src.stats_collector import StatsCollector
 from src.subscriber import Subscriber
 
 HOT_CONFIG_EXTENSION = 'src.extension.hot_config.HotConfig'
+STATS_EXPORTER_EXTENSION = 'src.extension.stats_exporter.StatsExporter'
+LOG_STATS_EXTENSION = 'src.extension.log_stats.LogStats'
 
 
 class Crawler:
@@ -76,6 +78,12 @@ class Crawler:
         if (self.settings.getbool('HOT_CONFIG_ENABLED')
                 and HOT_CONFIG_EXTENSION not in extensions):
             extensions.append(HOT_CONFIG_EXTENSION)
+        if self.settings.getbool('STATS_EXPORT_ENABLED'):
+            # StatsExporter 依赖 LogStats 填充的计数器,自动带上(须在其前)
+            if LOG_STATS_EXTENSION not in extensions:
+                extensions.append(LOG_STATS_EXTENSION)
+            if STATS_EXPORTER_EXTENSION not in extensions:
+                extensions.append(STATS_EXPORTER_EXTENSION)
         self.settings.set('EXTENSIONS', extensions)
         from src.extension import ExtensionManager
         self.extension_manager = ExtensionManager(self)
