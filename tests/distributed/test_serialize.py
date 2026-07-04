@@ -1,8 +1,8 @@
 import pytest
 
-from src.distributed.serialize import (
+from cola.distributed.serialize import (
     request_from_dict, request_from_json, request_to_dict, request_to_json)
-from src.http.request import Request
+from cola.http.request import Request
 from tests.distributed.conftest import make_crawler
 
 

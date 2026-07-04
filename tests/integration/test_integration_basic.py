@@ -6,12 +6,12 @@ These tests verify that components work together correctly.
 import pytest
 import asyncio
 from unittest.mock import Mock, AsyncMock, patch
-from src.http.request import Request
-from src.http.response import Response
-from src.spiders import Spider
-from src.settings.settings_manager import SettingsManager
-from src.stats_collector import StatsCollector
-from src.core.scheduler import Scheduler
+from cola.http.request import Request
+from cola.http.response import Response
+from cola.spiders import Spider
+from cola.settings.settings_manager import SettingsManager
+from cola.stats_collector import StatsCollector
+from cola.core.scheduler import Scheduler
 
 
 class SimpleSpider(Spider):

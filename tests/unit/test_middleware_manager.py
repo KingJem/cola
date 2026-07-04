@@ -1,9 +1,9 @@
 import asyncio
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from src.middlewares import MiddlewareManager
-from src.http.request import Request
-from src.http.response import Response
+from cola.middlewares import MiddlewareManager
+from cola.http.request import Request
+from cola.http.response import Response
 
 
 def make_crawler(middlewares=None):

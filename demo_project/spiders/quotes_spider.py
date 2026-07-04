@@ -2,10 +2,10 @@
 示例爬虫：爬取 Quotes to Scrape 网站
 演示 Cola 框架的基本功能
 """
-from src.spiders import Spider
-from src.http.request import Request
-from src.http.response import Response
-from src.item.items import Item
+from cola.spiders import Spider
+from cola.http.request import Request
+from cola.http.response import Response
+from cola.item.items import Item
 
 
 class QuoteItem(Item):
@@ -30,8 +30,8 @@ class QuotesSpider(Spider):
         'PROJECT_NAME': 'quotes_demo',
         # Item Pipeline 配置（数字为优先级，升序执行）
         'ITEM_PIPELINES': {
-            'src.pipeline.console.ConsolePipeline': 100,
-            'src.pipeline.json_pipeline.JsonPipeline': 800,
+            'cola.pipeline.console.ConsolePipeline': 100,
+            'cola.pipeline.json_pipeline.JsonPipeline': 800,
         },
         'JSON_FEED_URI': 'quotes_output.jl',
         'DUPEFILTER_DEBUG': True,

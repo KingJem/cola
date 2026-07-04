@@ -1,5 +1,5 @@
-from src.http.request import Request
-from src.redis_dupefilter import RedisRFPDupeFilter
+from cola.http.request import Request
+from cola.redis_dupefilter import RedisRFPDupeFilter
 
 
 class FakeRedis:

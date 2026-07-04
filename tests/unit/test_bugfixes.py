@@ -4,11 +4,11 @@ follow 相对 URL、proxy/cookies 传递、POST 指纹、配置优先级分层�
 """
 from unittest.mock import Mock
 
-from src.downloaders.aio_http_downloader import AioHttpDownloader
-from src.dupefilter import RFPDupeFilter
-from src.http.request import Request
-from src.http.response import Response
-from src.settings.settings_manager import (
+from cola.downloaders.aio_http_downloader import AioHttpDownloader
+from cola.dupefilter import RFPDupeFilter
+from cola.http.request import Request
+from cola.http.response import Response
+from cola.settings.settings_manager import (
     PRIORITY_SPIDER, SettingsManager)
 
 

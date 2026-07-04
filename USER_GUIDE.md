@@ -23,8 +23,8 @@ uv sync
 ### 第一个爬虫
 
 ```python
-from src.spiders import Spider
-from src.http.request import Request
+from cola.spiders import Spider
+from cola.http.request import Request
 
 class MySpider(Spider):
     start_urls = ['https://example.com']
@@ -42,8 +42,8 @@ class MySpider(Spider):
 
 ```python
 import asyncio
-from src.crawler import CrawlerProcess
-from src.utils.project import get_settings
+from cola.crawler import CrawlerProcess
+from cola.utils.project import get_settings
 
 async def main():
     settings = get_settings()
@@ -99,7 +99,7 @@ next_req = response.follow('/page/2')     # 生成新请求
 ### Item（数据项）
 
 ```python
-from src.item.items import Item
+from cola.item.items import Item
 
 class ProductItem(Item):
     FIELDS = {
@@ -135,14 +135,14 @@ RETRY_HTTP_CODES = [408, 429, 500, 502, 503, 504, 522, 524]
 
 ### 重试、限流与过滤
 
-重试由 `src.middleware.retry.Retry` 中间件负责(默认启用):命中
+重试由 `cola.middleware.retry.Retry` 中间件负责(默认启用):命中
 `RETRY_HTTP_CODES` 的响应或网络异常会重新入队,超过 `MAX_RETRY_TIMES`
 放弃;单请求可 `request.meta['dont_retry'] = True` 关闭。
 
 ```python
 DOWNLOADER_MIDDLEWARES = {
-    'src.middleware.retry.Retry': 100,
-    'src.middleware.offsite.Offsite': 50,   # 按 spider.allowed_domains 过滤
+    'cola.middleware.retry.Retry': 100,
+    'cola.middleware.offsite.Offsite': 50,   # 按 spider.allowed_domains 过滤
 }
 
 class MySpider(Spider):
@@ -185,7 +185,7 @@ pip install 'cola[redis]'
 ```
 
 ```python
-DUPEFILTER_CLASS = 'src.redis_dupefilter.RedisRFPDupeFilter'
+DUPEFILTER_CLASS = 'cola.redis_dupefilter.RedisRFPDupeFilter'
 REDIS_URL = 'redis://redis:6379/0'
 REDIS_DUPEFILTER_KEY = 'my-project:dupefilter'
 # 保持 True，避免任一 Worker 结束时清空所有节点共用的去重集合。
@@ -203,15 +203,15 @@ master_settings = {
     'PROJECT_NAME': 'myproj',
     'NODE_ROLE': 'master',
     'REDIS_URL': 'redis://redis:6379/0',
-    'SCHEDULER_CLASS': 'src.distributed.scheduler.RedisScheduler',
-    'DUPEFILTER_CLASS': 'src.distributed.dupefilter.AsyncRedisDupeFilter',
+    'SCHEDULER_CLASS': 'cola.distributed.scheduler.RedisScheduler',
+    'DUPEFILTER_CLASS': 'cola.distributed.dupefilter.AsyncRedisDupeFilter',
     # 种子来源(可多个):redis / mysql / postgres / doris / rabbitmq
-    'SEED_SOURCES': ['src.datasources.mysql_source.MySQLSeedProvider'],
+    'SEED_SOURCES': ['cola.datasources.mysql_source.MySQLSeedProvider'],
     'SEED_SQL': 'SELECT url, category FROM seeds WHERE status = 0',
     'MYSQL_HOST': 'mysql', 'MYSQL_DB': 'crawler',
     'MYSQL_USER': 'root', 'MYSQL_PASSWORD': '***',
     # 结果存储(可多个):redis / mysql / postgres / doris / rabbitmq
-    'ITEM_PIPELINES': {'src.pipeline.mysql_pipeline.MySQLPipeline': 300},
+    'ITEM_PIPELINES': {'cola.pipeline.mysql_pipeline.MySQLPipeline': 300},
     'MYSQL_TABLE': 'results',
 }
 
@@ -339,4 +339,4 @@ python demo_project/run.py
 
 - [API 参考文档](API_REFERENCE.md)
 - [测试代码](tests/)
-- [默认配置](src/settings/default.py)
+- [默认配置](cola/settings/default.py)

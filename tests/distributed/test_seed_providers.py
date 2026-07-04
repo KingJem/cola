@@ -2,11 +2,11 @@ import json
 
 import pytest
 
-from src.datasources.mysql_source import MySQLSeedProvider
-from src.datasources.postgres_source import PostgresSeedProvider
-from src.datasources.rabbitmq_source import RabbitMQSeedProvider
-from src.datasources.redis_source import RedisSeedProvider
-from src.distributed.seed_loader import seed_to_request
+from cola.datasources.mysql_source import MySQLSeedProvider
+from cola.datasources.postgres_source import PostgresSeedProvider
+from cola.datasources.rabbitmq_source import RabbitMQSeedProvider
+from cola.datasources.redis_source import RedisSeedProvider
+from cola.distributed.seed_loader import seed_to_request
 from tests.distributed.conftest import (
     MYSQL, POSTGRES_DSN, RABBITMQ_URL, make_crawler)
 

@@ -228,7 +228,7 @@ async def _schedule_request(self, request):
 ### 4.4 新增默认配置
 
 ```python
-DUPEFILTER_CLASS = 'src.dupefilter.RFPDupeFilter'
+DUPEFILTER_CLASS = 'cola.dupefilter.RFPDupeFilter'
 DUPEFILTER_DEBUG = False
 ```
 

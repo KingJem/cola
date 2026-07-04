@@ -3,10 +3,10 @@ import json
 import os
 import pytest
 from unittest.mock import MagicMock, AsyncMock
-from src.pipeline import PipelineManager, DropItem
-from src.pipeline.base import BasePipeline
-from src.pipeline.console import ConsolePipeline
-from src.item.items import Item
+from cola.pipeline import PipelineManager, DropItem
+from cola.pipeline.base import BasePipeline
+from cola.pipeline.console import ConsolePipeline
+from cola.item.items import Item
 
 
 def make_item(**kwargs):
@@ -15,7 +15,7 @@ def make_item(**kwargs):
 
 
 def make_crawler(pipelines=None):
-    from src.subscriber import Subscriber
+    from cola.subscriber import Subscriber
     crawler = MagicMock()
     crawler.settings.get.return_value = pipelines or {}
     crawler.spider = MagicMock()

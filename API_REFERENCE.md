@@ -4,7 +4,7 @@
 
 ### Spider
 
-**路径**: `src.spiders.Spider`
+**路径**: `cola.spiders.Spider`
 
 基础爬虫类，所有爬虫必须继承此类。
 
@@ -50,7 +50,7 @@ async def parse(self, response):
 
 ### Request
 
-**路径**: `src.http.request.Request`
+**路径**: `cola.http.request.Request`
 
 HTTP 请求封装类。
 
@@ -97,7 +97,7 @@ Request(
 
 ### Response
 
-**路径**: `src.http.response.Response`
+**路径**: `cola.http.response.Response`
 
 HTTP 响应封装类。
 
@@ -182,14 +182,14 @@ links = response.xpath('//a/@href')
 
 ### Item
 
-**路径**: `src.item.items.Item`
+**路径**: `cola.item.items.Item`
 
 结构化数据容器。
 
 #### 使用方法
 
 ```python
-from src.item.items import Item
+from cola.item.items import Item
 
 class MyItem(Item):
     FIELDS = {
@@ -218,7 +218,7 @@ data = item.todict()
 
 ### Crawler
 
-**路径**: `src.crawler.Crawler`
+**路径**: `cola.crawler.Crawler`
 
 爬虫实例管理器。
 
@@ -245,7 +245,7 @@ data = item.todict()
 
 ### CrawlerProcess
 
-**路径**: `src.crawler.CrawlerProcess`
+**路径**: `cola.crawler.CrawlerProcess`
 
 爬虫进程管理器。
 
@@ -279,7 +279,7 @@ await process.start()
 
 ### Engine
 
-**路径**: `src.core.engine.Engine`
+**路径**: `cola.core.engine.Engine`
 
 爬虫引擎，协调各组件。
 
@@ -301,7 +301,7 @@ await process.start()
 
 ### Scheduler
 
-**路径**: `src.core.scheduler.Scheduler`
+**路径**: `cola.core.scheduler.Scheduler`
 
 请求调度器（优先级队列）。
 
@@ -325,13 +325,13 @@ await process.start()
 
 ### Downloader
 
-**路径**: `src.downloaders.Downloader`
+**路径**: `cola.downloaders.Downloader`
 
 下载器基类。
 
 ### AioHttpDownloader
 
-**路径**: `src.downloaders.aio_http_downloader.AioHttpDownloader`
+**路径**: `cola.downloaders.aio_http_downloader.AioHttpDownloader`
 
 基于 aiohttp 的异步下载器。
 
@@ -347,7 +347,7 @@ await process.start()
 
 ### SettingsManager
 
-**路径**: `src.settings.settings_manager.SettingsManager`
+**路径**: `cola.settings.settings_manager.SettingsManager`
 
 配置管理器。
 
@@ -392,7 +392,7 @@ timeout = settings.getint('TIMEOUT', 30)
 
 ### StatsCollector
 
-**路径**: `src.stats_collector.StatsCollector`
+**路径**: `cola.stats_collector.StatsCollector`
 
 统计信息收集器。
 
@@ -422,7 +422,7 @@ stats.inc_value('count', 1)
 
 ### 项目工具
 
-**路径**: `src.utils.project`
+**路径**: `cola.utils.project`
 
 ##### `get_settings() -> SettingsManager`
 
@@ -430,14 +430,14 @@ stats.inc_value('count', 1)
 
 ### 类加载器
 
-**路径**: `src.utils`
+**路径**: `cola.utils`
 
 ##### `load_class(path: str) -> type`
 
 动态加载类。
 
 **参数**:
-- `path` (str): 类的完整路径，如 'src.spiders.Spider'
+- `path` (str): 类的完整路径，如 'cola.spiders.Spider'
 
 **返回**: 类对象
 
@@ -449,7 +449,7 @@ stats.inc_value('count', 1)
 |--------|--------|------|
 | `PROJECT_NAME` | 'test' | 项目名称 |
 | `CONCURRENT_REQUESTS` | 16 | 并发请求数 |
-| `DOWNLOADER_CLASS` | 'src.downloaders.aio_http_downloader.AioHttpDownloader' | 下载器类 |
+| `DOWNLOADER_CLASS` | 'cola.downloaders.aio_http_downloader.AioHttpDownloader' | 下载器类 |
 | `VERIFY_SSL` | False | SSL验证 |
 | `TIMEOUT` | 30 | 请求超时（秒） |
 | `MAX_RETRY` | 3 | 最大重试次数 |
@@ -459,7 +459,7 @@ stats.inc_value('count', 1)
 
 ## 异常类
 
-**路径**: `src.exceptions`
+**路径**: `cola.exceptions`
 
 框架定义的自定义异常（待补充）。
 

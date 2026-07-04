@@ -9,10 +9,10 @@
 """
 import pytest
 
-from src.crawler import Crawler
-from src.settings.settings_manager import SettingsManager
-from src.spiders import Spider
-from src.stats_collector import StatsCollector
+from cola.crawler import Crawler
+from cola.settings.settings_manager import SettingsManager
+from cola.spiders import Spider
+from cola.stats_collector import StatsCollector
 
 REDIS_URL = 'redis://localhost:6379/15'
 MYSQL = dict(host='localhost', port=3307, user='root', password='cola123',

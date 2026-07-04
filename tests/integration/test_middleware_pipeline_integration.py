@@ -4,11 +4,11 @@
 import asyncio
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from src.http.request import Request
-from src.http.response import Response
-from src.middlewares import MiddlewareManager
-from src.dupefilter import RFPDupeFilter
-from src.pipeline import PipelineManager
+from cola.http.request import Request
+from cola.http.response import Response
+from cola.middlewares import MiddlewareManager
+from cola.dupefilter import RFPDupeFilter
+from cola.pipeline import PipelineManager
 
 
 def make_response(url='http://example.com/', status=200):
@@ -17,7 +17,7 @@ def make_response(url='http://example.com/', status=200):
 
 
 def make_crawler_with_settings(**settings_dict):
-    from src.subscriber import Subscriber
+    from cola.subscriber import Subscriber
     crawler = MagicMock()
     crawler.settings.get.side_effect = lambda key, default=None: settings_dict.get(key, default)
     crawler.settings.getbool.side_effect = lambda key, default=False: settings_dict.get(key, default)
@@ -78,7 +78,7 @@ async def test_middleware_modifies_request_headers():
     crawler = make_crawler_with_settings(
         DOWNLOADER_MIDDLEWARES={'__main__.HeaderMiddleware': 100}
     )
-    with patch('src.middlewares.load_class', return_value=HeaderMiddleware):
+    with patch('cola.middlewares.load_class', return_value=HeaderMiddleware):
         manager = MiddlewareManager(crawler)
     req = Request(url='http://example.com/')
     await manager.process_request(req, spider=None)

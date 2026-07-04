@@ -2,9 +2,9 @@ import asyncio
 
 import pytest
 
-from src.distributed.dupefilter import AsyncRedisDupeFilter
-from src.distributed.scheduler import RedisScheduler
-from src.http.request import Request
+from cola.distributed.dupefilter import AsyncRedisDupeFilter
+from cola.distributed.scheduler import RedisScheduler
+from cola.http.request import Request
 from tests.distributed.conftest import make_crawler
 
 

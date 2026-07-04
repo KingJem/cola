@@ -3,8 +3,8 @@ Tests for the Response class.
 """
 import pytest
 import json
-from src.http.request import Request
-from src.http.response import Response
+from cola.http.request import Request
+from cola.http.response import Response
 
 
 class TestResponseBasics:

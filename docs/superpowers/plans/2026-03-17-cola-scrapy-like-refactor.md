@@ -58,7 +58,7 @@
 import importlib.util
 import sys
 import os
-from src.settings.settings_manager import SettingsManager
+from cola.settings.settings_manager import SettingsManager
 
 
 def get_settings(settings_module: str = 'settings') -> SettingsManager:
@@ -66,7 +66,7 @@ def get_settings(settings_module: str = 'settings') -> SettingsManager:
     动态加载用户项目的 settings.py 并返回 SettingsManager。
     从当前工作目录查找 settings 模块。
     """
-    from src.settings.default import get_default_settings
+    from cola.settings.default import get_default_settings
     manager = SettingsManager(get_default_settings())
 
     # 尝试加载用户 settings 模块
@@ -114,9 +114,9 @@ def get_default_settings() -> dict:
 import asyncio
 import requests
 
-from src.downloaders import Downloader, SyncDownloaderManager
-from src.http.request import Request
-from src.http.response import Response
+from cola.downloaders import Downloader, SyncDownloaderManager
+from cola.http.request import Request
+from cola.http.response import Response
 
 
 class RequestsDownloader(Downloader):
@@ -165,7 +165,7 @@ class RequestsDownloader(Downloader):
 # 新增到 default.py
 DOWNLOADER_MIDDLEWARES = {}   # {class_path: priority}
 ITEM_PIPELINES = {}           # {class_path: priority}
-DUPEFILTER_CLASS = 'src.dupefilter.RFPDupeFilter'
+DUPEFILTER_CLASS = 'cola.dupefilter.RFPDupeFilter'
 DUPEFILTER_DEBUG = False
 JSON_FEED_URI = 'output.jl'
 CSV_FEED_URI = 'output.csv'
@@ -203,8 +203,8 @@ git commit -m "fix: repair get_settings bug, requests_downloader inheritance, ad
 
 ```python
 import pytest
-from src.dupefilter import RFPDupeFilter
-from src.http.request import Request
+from cola.dupefilter import RFPDupeFilter
+from cola.http.request import Request
 
 
 def make_request(url, method='GET'):
@@ -269,7 +269,7 @@ def test_dont_filter_bypasses_dupefilter():
 cd /Users/king/code/cola && python -m pytest tests/unit/test_dupefilter.py -v 2>&1 | head -30
 ```
 
-预期：`ModuleNotFoundError: No module named 'src.dupefilter'`
+预期：`ModuleNotFoundError: No module named 'cola.dupefilter'`
 
 - [ ] **Step 2.3: 实现 `src/dupefilter.py`**
 
@@ -376,8 +376,8 @@ def start_requests(self):
 1. `__init__` 新增 `self.dupe_filter = None`
 2. `start_spider()` 初始化：
    ```python
-   from src.utils import load_class
-   dupefilter_cls_path = self.settings.get('DUPEFILTER_CLASS', 'src.dupefilter.RFPDupeFilter')
+   from cola.utils import load_class
+   dupefilter_cls_path = self.settings.get('DUPEFILTER_CLASS', 'cola.dupefilter.RFPDupeFilter')
    dupefilter_cls = load_class(dupefilter_cls_path)
    self.dupe_filter = dupefilter_cls.from_crawler(self.crawler)
    ```
@@ -433,9 +433,9 @@ git commit -m "feat: add RFPDupeFilter request deduplication with SHA1 fingerpri
 import asyncio
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from src.middlewares import MiddlewareManager
-from src.http.request import Request
-from src.http.response import Response
+from cola.middlewares import MiddlewareManager
+from cola.http.request import Request
+from cola.http.response import Response
 
 
 def make_crawler(middlewares=None):
@@ -627,7 +627,7 @@ from typing import Optional
 
 from loguru import logger
 
-from src.utils import load_class
+from cola.utils import load_class
 
 
 async def _call_maybe_async(method, *args):
@@ -726,7 +726,7 @@ class MiddlewareManager:
 
 2. `start_spider()` 中初始化（在 `open_spider()` 调用之前）：
    ```python
-   from src.middlewares import MiddlewareManager
+   from cola.middlewares import MiddlewareManager
    self.middleware_manager = MiddlewareManager(self.crawler)
    ```
 
@@ -736,7 +736,7 @@ class MiddlewareManager:
        # 1. 中间件 process_request 链
        result = await self.middleware_manager.process_request(request, self.spider)
 
-       from src.http.response import Response as HttpResponse
+       from cola.http.response import Response as HttpResponse
        if isinstance(result, HttpResponse):
            response = result  # 中间件短路返回了 Response
        else:
@@ -837,10 +837,10 @@ import json
 import os
 import pytest
 from unittest.mock import MagicMock, AsyncMock
-from src.pipeline import PipelineManager, DropItem
-from src.pipeline.base import BasePipeline
-from src.pipeline.console import ConsolePipeline
-from src.item.items import Item
+from cola.pipeline import PipelineManager, DropItem
+from cola.pipeline.base import BasePipeline
+from cola.pipeline.console import ConsolePipeline
+from cola.item.items import Item
 
 
 def make_item(**kwargs):
@@ -1026,7 +1026,7 @@ class BasePipeline:
 ```python
 """ConsolePipeline：将 Item 打印到终端，用于调试"""
 from loguru import logger
-from src.pipeline.base import BasePipeline
+from cola.pipeline.base import BasePipeline
 
 
 class ConsolePipeline(BasePipeline):
@@ -1036,7 +1036,7 @@ class ConsolePipeline(BasePipeline):
 
     配置：
         ITEM_PIPELINES = {
-            'src.pipeline.console.ConsolePipeline': 100,
+            'cola.pipeline.console.ConsolePipeline': 100,
         }
     """
 
@@ -1052,7 +1052,7 @@ class ConsolePipeline(BasePipeline):
 import json
 from pathlib import Path
 from loguru import logger
-from src.pipeline.base import BasePipeline
+from cola.pipeline.base import BasePipeline
 
 
 class JsonPipeline(BasePipeline):
@@ -1061,7 +1061,7 @@ class JsonPipeline(BasePipeline):
 
     配置：
         ITEM_PIPELINES = {
-            'src.pipeline.json_pipeline.JsonPipeline': 800,
+            'cola.pipeline.json_pipeline.JsonPipeline': 800,
         }
         JSON_FEED_URI = 'output.jl'  # 输出文件路径（默认 output.jl）
     """
@@ -1104,7 +1104,7 @@ class JsonPipeline(BasePipeline):
 import csv
 from pathlib import Path
 from loguru import logger
-from src.pipeline.base import BasePipeline
+from cola.pipeline.base import BasePipeline
 
 
 class CsvPipeline(BasePipeline):
@@ -1114,7 +1114,7 @@ class CsvPipeline(BasePipeline):
 
     配置：
         ITEM_PIPELINES = {
-            'src.pipeline.csv_pipeline.CsvPipeline': 900,
+            'cola.pipeline.csv_pipeline.CsvPipeline': 900,
         }
         CSV_FEED_URI = 'output.csv'  # 输出文件路径（默认 output.csv）
     """
@@ -1164,7 +1164,7 @@ Item Pipeline 管理器。
 ITEM_PIPELINES 配置格式：
     {
         'path.to.MyPipeline': 300,   # 数字为优先级，升序执行
-        'src.pipeline.json_pipeline.JsonPipeline': 800,
+        'cola.pipeline.json_pipeline.JsonPipeline': 800,
     }
 """
 import inspect
@@ -1173,8 +1173,8 @@ from typing import List, Optional
 
 from loguru import logger
 
-from src.pipeline.base import BasePipeline, DropItem
-from src.utils import load_class
+from cola.pipeline.base import BasePipeline, DropItem
+from cola.utils import load_class
 
 
 async def _call_maybe_async(method, *args):
@@ -1246,8 +1246,8 @@ class PipelineManager:
 from asyncio.queues import Queue
 from typing import Any, Union
 
-from src.core.request import Request
-from src.item.items import Item
+from cola.core.request import Request
+from cola.item.items import Item
 
 
 class Processor:
@@ -1290,7 +1290,7 @@ class Processor:
 
 2. `crawl()` 中，在 `engine.start_spider()` 之前初始化：
    ```python
-   from src.pipeline import PipelineManager
+   from cola.pipeline import PipelineManager
    self.pipeline_manager = PipelineManager(self)
    await self.pipeline_manager.open_spider(self.spider)
    ```
@@ -1341,11 +1341,11 @@ git commit -m "feat: implement Item Pipeline system with PipelineManager, Consol
 import asyncio
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from src.http.request import Request
-from src.http.response import Response
-from src.middlewares import MiddlewareManager
-from src.dupefilter import RFPDupeFilter
-from src.pipeline import PipelineManager
+from cola.http.request import Request
+from cola.http.response import Response
+from cola.middlewares import MiddlewareManager
+from cola.dupefilter import RFPDupeFilter
+from cola.pipeline import PipelineManager
 
 
 def make_response(url='http://example.com/', status=200):
@@ -1413,7 +1413,7 @@ async def test_middleware_modifies_request_headers():
     crawler = make_crawler_with_settings(
         DOWNLOADER_MIDDLEWARES={'__main__.HeaderMiddleware': 100}
     )
-    with patch('src.middlewares.load_class', return_value=HeaderMiddleware):
+    with patch('cola.middlewares.load_class', return_value=HeaderMiddleware):
         manager = MiddlewareManager(crawler)
     req = Request(url='http://example.com/')
     await manager.process_request(req, spider=None)
@@ -1442,8 +1442,8 @@ cd /Users/king/code/cola && python -m pytest tests/ -v 2>&1 | tail -30
 # demo_project 中展示用法的 custom_settings
 custom_settings = {
     'ITEM_PIPELINES': {
-        'src.pipeline.console.ConsolePipeline': 100,
-        'src.pipeline.json_pipeline.JsonPipeline': 800,
+        'cola.pipeline.console.ConsolePipeline': 100,
+        'cola.pipeline.json_pipeline.JsonPipeline': 800,
     },
     'JSON_FEED_URI': 'quotes_output.jl',
     'DUPEFILTER_DEBUG': True,

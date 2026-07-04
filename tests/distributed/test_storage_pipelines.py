@@ -2,10 +2,10 @@ import json
 
 import pytest
 
-from src.pipeline.mysql_pipeline import MySQLPipeline
-from src.pipeline.postgres_pipeline import PostgresPipeline
-from src.pipeline.rabbitmq_pipeline import RabbitMQPipeline
-from src.pipeline.redis_pipeline import RedisPipeline
+from cola.pipeline.mysql_pipeline import MySQLPipeline
+from cola.pipeline.postgres_pipeline import PostgresPipeline
+from cola.pipeline.rabbitmq_pipeline import RabbitMQPipeline
+from cola.pipeline.redis_pipeline import RedisPipeline
 from tests.distributed.conftest import (
     MYSQL, POSTGRES_DSN, RABBITMQ_URL, make_crawler)
 

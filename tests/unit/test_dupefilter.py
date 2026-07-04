@@ -1,6 +1,6 @@
 import pytest
-from src.dupefilter import RFPDupeFilter
-from src.http.request import Request
+from cola.dupefilter import RFPDupeFilter
+from cola.http.request import Request
 
 
 def make_request(url, method='GET'):

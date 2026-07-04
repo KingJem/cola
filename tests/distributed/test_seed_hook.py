@@ -1,5 +1,5 @@
 """make_request_from_seed 钩子:默认委托 seed_to_request,子类可重写。"""
-from src.http.request import Request
+from cola.http.request import Request
 from tests.distributed.conftest import make_crawler
 
 
@@ -61,9 +61,9 @@ def test_override_can_skip_seed():
 async def test_seed_loader_uses_override(redis_client):
     """SeedLoader 经钩子加载:重写后整个 task 进 meta,写入共享队列。"""
     import json
-    from src.distributed.scheduler import RedisScheduler
-    from src.distributed.seed_loader import SeedLoader
-    from src.datasources.redis_source import RedisSeedProvider
+    from cola.distributed.scheduler import RedisScheduler
+    from cola.distributed.seed_loader import SeedLoader
+    from cola.datasources.redis_source import RedisSeedProvider
     from tests.distributed.conftest import DistTestSpider
 
     class TaskSpider(DistTestSpider):
@@ -76,8 +76,8 @@ async def test_seed_loader_uses_override(redis_client):
         json.dumps({'url': 'https://e.com/1', 'task_id': 7}))
 
     crawler = make_crawler({
-        'SEED_SOURCES': ['src.datasources.redis_source.RedisSeedProvider'],
-        'SCHEDULER_CLASS': 'src.distributed.scheduler.RedisScheduler',
+        'SEED_SOURCES': ['cola.datasources.redis_source.RedisSeedProvider'],
+        'SCHEDULER_CLASS': 'cola.distributed.scheduler.RedisScheduler',
     })
     crawler.spider = TaskSpider.create_instance(crawler)
 

@@ -2,7 +2,7 @@
 Tests for the Item class.
 """
 import pytest
-from src.item.items import Item
+from cola.item.items import Item
 
 
 class ProductItem(Item):

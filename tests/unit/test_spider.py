@@ -2,8 +2,8 @@
 Tests for the Spider base class.
 """
 import pytest
-from src.spiders import Spider
-from src.http.request import Request
+from cola.spiders import Spider
+from cola.http.request import Request
 from unittest.mock import Mock
 
 

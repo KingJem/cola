@@ -3,8 +3,8 @@ Tests for the SpiderPriorityQueue class.
 """
 import pytest
 import asyncio
-from src.utils.queue import SpiderPriorityQueue
-from src.http.request import Request
+from cola.utils.queue import SpiderPriorityQueue
+from cola.http.request import Request
 
 
 class TestQueueBasics:

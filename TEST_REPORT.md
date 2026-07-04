@@ -70,27 +70,27 @@ demo_project/
 在测试过程中，发现并修复了以下问题：
 
 ### 1. 缺少向后兼容模块
-**问题**: `src.core.response` 模块不存在  
-**修复**: 创建 [`src/core/response.py`](file:///Users/king/code/cola/src/core/response.py) 作为兼容性桥接
+**问题**: `cola.core.response` 模块不存在  
+**修复**: 创建 [`cola/core/response.py`](file:///Users/king/code/cola/cola/core/response.py) 作为兼容性桥接
 
 ### 2. 下载器未初始化
 **问题**: Session 未创建导致下载失败  
-**修复**: 在 [`engine.py`](file:///Users/king/code/cola/src/core/engine.py#L51) 的 `open_spider()` 中添加 `await self.open()` 调用
+**修复**: 在 [`engine.py`](file:///Users/king/code/cola/cola/core/engine.py#L51) 的 `open_spider()` 中添加 `await self.open()` 调用
 
 ### 3. 下载失败未处理
 **问题**: 下载返回 None 时回调仍被执行  
-**修复**: 在 [`engine.py:_fetch()`](file:///Users/king/code/cola/src/core/engine.py#L102-L105) 中添加 None 检查
+**修复**: 在 [`engine.py:_fetch()`](file:///Users/king/code/cola/cola/core/engine.py#L102-L105) 中添加 None 检查
 
 ### 4. 输出类型检查过于严格
 **问题**: 只允许 Item 或 Request，拒绝dict  
-**修复**: 在 [`engine.py:_handle_spider_outputs()`](file:///Users/king/code/cola/src/core/engine.py#L120-L133) 中支持dict输出
+**修复**: 在 [`engine.py:_handle_spider_outputs()`](file:///Users/king/code/cola/cola/core/engine.py#L120-L133) 中支持dict输出
 
 ### 5. Item 类初始化问题
 **问题**: `FIELDS` 为None导致TypeError  
 **修复**: 
-- 修复 [`items.py:__init__()`](file:///Users/king/code/cola/src/item/items.py#L10-L16) 使用 `object.__setattr__`
-- 修复 [`items.py:__setitem__()`](file:///Users/king/code/cola/src/item/items.py#L18-L34) 正确处理FIELDS
-- 修复 [`items.py:__setattr__()`](file:///Users/king/code/cola/src/item/items.py#L44-L48) 允许下划线属性
+- 修复 [`items.py:__init__()`](file:///Users/king/code/cola/cola/item/items.py#L10-L16) 使用 `object.__setattr__`
+- 修复 [`items.py:__setitem__()`](file:///Users/king/code/cola/cola/item/items.py#L18-L34) 正确处理FIELDS
+- 修复 [`items.py:__setattr__()`](file:///Users/king/code/cola/cola/item/items.py#L44-L48) 允许下划线属性
 
 ### 6. Item 实例检查失败
 **问题**: `isinstance(output, Item)` 导致 TypeError  
@@ -98,7 +98,7 @@ demo_project/
 
 ### 7. 错误日志缺失
 **问题**: 下载失败时没有日志信息  
-**修复**: 在 [`aio_http_downloader.py`](file:///Users/king/code/cola/src/downloaders/aio_http_downloader.py#L40) 添加错误日志
+**修复**: 在 [`aio_http_downloader.py`](file:///Users/king/code/cola/cola/downloaders/aio_http_downloader.py#L40) 添加错误日志
 
 ## ✅ 测试功能验证
 

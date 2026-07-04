@@ -4,8 +4,8 @@ import json
 import pytest
 from aiohttp import web
 
-from src.extension import stats_backends as sb
-from src.settings.settings_manager import SettingsManager
+from cola.extension import stats_backends as sb
+from cola.settings.settings_manager import SettingsManager
 
 SNAP = {
     'node': 'n1', 'pages_per_sec': 1.4, 'items_per_sec': 2.0,

@@ -1,8 +1,8 @@
 import asyncio
 import json
 
-from src.extension.hot_config import HotConfig
-from src.task_manager import TaskManager
+from cola.extension.hot_config import HotConfig
+from cola.task_manager import TaskManager
 from tests.distributed.conftest import make_crawler
 
 

@@ -4,10 +4,10 @@ import textwrap
 
 import pytest
 
-from src.runner import discover_spiders, main
+from cola.runner import discover_spiders, main
 
 SPIDER_MODULE = textwrap.dedent('''
-    from src.spiders import Spider
+    from cola.spiders import Spider
 
     class NoopSpider(Spider):
         start_urls = []

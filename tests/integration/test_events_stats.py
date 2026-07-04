@@ -7,9 +7,9 @@ import asyncio
 import pytest
 from aiohttp import web
 
-from src.crawler import Crawler
-from src.settings.settings_manager import SettingsManager
-from src.spiders import Spider
+from cola.crawler import Crawler
+from cola.settings.settings_manager import SettingsManager
+from cola.spiders import Spider
 
 
 @pytest.fixture
@@ -42,13 +42,13 @@ async def test_events_counted_and_errors_survive(chain_server):
                 raise ValueError('boom on page 3')
             yield {'page': data['page']}
             if data['next']:
-                from src.http.request import Request
+                from cola.http.request import Request
                 yield Request(url=data['next'], callback=self.parse)
 
     settings = SettingsManager({
         'PROJECT_NAME': 'events_test',
         'CONCURRENT_REQUESTS': 2,
-        'EXTENSIONS': ['src.extension.log_stats.LogStats'],
+        'EXTENSIONS': ['cola.extension.log_stats.LogStats'],
     })
     crawler = Crawler(ChainSpider, settings)
     await asyncio.wait_for(crawler.crawl(), timeout=30)

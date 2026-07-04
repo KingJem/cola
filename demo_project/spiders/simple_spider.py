@@ -2,9 +2,9 @@
 简单的HTTP服务器测试爬虫
 用于测试本地网页爬取
 """
-from src.spiders import Spider
-from src.http.request import Request
-from src.http.response import Response
+from cola.spiders import Spider
+from cola.http.request import Request
+from cola.http.response import Response
 
 
 class SimpleSpider(Spider):

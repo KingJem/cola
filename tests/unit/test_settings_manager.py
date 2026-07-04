@@ -2,8 +2,8 @@
 Tests for the SettingsManager class.
 """
 import pytest
-from src.settings.settings_manager import SettingsManager
-from src.settings import default
+from cola.settings.settings_manager import SettingsManager
+from cola.settings import default
 
 
 class TestSettingsManagerBasics:
@@ -220,7 +220,7 @@ class TestSettingsManagerModuleLoading:
     def test_set_setting_module_string(self):
         """Test loading settings from module string."""
         settings = SettingsManager()
-        settings.set_setting('src.settings.default')
+        settings.set_setting('cola.settings.default')
         
         # Should have loaded settings
         assert len(settings) > 0

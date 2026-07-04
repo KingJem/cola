@@ -5,9 +5,9 @@ import json
 import pytest
 from aiohttp import web
 
-from src.crawler import Crawler
-from src.settings.settings_manager import SettingsManager
-from src.spiders import Spider
+from cola.crawler import Crawler
+from cola.settings.settings_manager import SettingsManager
+from cola.spiders import Spider
 
 
 @pytest.fixture
@@ -40,7 +40,7 @@ async def test_exporter_writes_snapshots(server, tmp_path):
             data = response.json()
             yield {'page': data['page']}
             if data['next']:
-                from src.http.request import Request
+                from cola.http.request import Request
                 yield Request(url=data['next'], callback=self.parse)
 
     crawler = Crawler(ChainSpider, SettingsManager({

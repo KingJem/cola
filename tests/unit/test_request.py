@@ -2,7 +2,7 @@
 Tests for the Request class.
 """
 import pytest
-from src.http.request import Request
+from cola.http.request import Request
 
 
 class TestRequestBasics:

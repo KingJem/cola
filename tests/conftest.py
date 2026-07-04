@@ -4,9 +4,9 @@ Pytest configuration and shared fixtures for Cola framework tests.
 import pytest
 import asyncio
 from unittest.mock import Mock, MagicMock
-from src.settings.settings_manager import SettingsManager
-from src.http.request import Request
-from src.http.response import Response
+from cola.settings.settings_manager import SettingsManager
+from cola.http.request import Request
+from cola.http.response import Response
 
 
 @pytest.fixture
@@ -21,7 +21,7 @@ def custom_settings():
     return SettingsManager({
         'PROJECT_NAME': 'TestProject',
         'CONCURRENT_REQUESTS': 16,
-        'DOWNLOADER_CLASS': 'src.downloaders.aio_http_downloader.AioHttpDownloader'
+        'DOWNLOADER_CLASS': 'cola.downloaders.aio_http_downloader.AioHttpDownloader'
     })
 
 

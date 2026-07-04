@@ -51,8 +51,8 @@ python run.py
 
 ```python
 import asyncio
-from src.crawler import CrawlerProcess
-from src.settings.settings_manager import SettingsManager
+from cola.crawler import CrawlerProcess
+from cola.settings.settings_manager import SettingsManager
 from demo_project.spiders.simple_spider import SimpleSpider
 
 async def main():

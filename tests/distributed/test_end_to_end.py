@@ -7,9 +7,9 @@ import json
 import pytest
 from aiohttp import web
 
-from src.crawler import Crawler
-from src.settings.settings_manager import SettingsManager
-from src.spiders import Spider
+from cola.crawler import Crawler
+from cola.settings.settings_manager import SettingsManager
+from cola.spiders import Spider
 from tests.distributed.conftest import REDIS_URL
 
 PROJECT = 'cola_e2e'
@@ -23,7 +23,7 @@ class TreeSpider(Spider):
     async def parse(self, response):
         data = response.json()
         yield {'page': data['page'], 'node': self.crawler.settings.get('NODE_NAME')}
-        from src.http.request import Request
+        from cola.http.request import Request
         for link in data['links']:
             yield Request(url=link, callback=self.parse)
 
@@ -54,15 +54,15 @@ def node_settings(role, name):
         'NODE_ROLE': role,
         'NODE_NAME': name,
         'REDIS_URL': REDIS_URL,
-        'SCHEDULER_CLASS': 'src.distributed.scheduler.RedisScheduler',
-        'DUPEFILTER_CLASS': 'src.distributed.dupefilter.AsyncRedisDupeFilter',
+        'SCHEDULER_CLASS': 'cola.distributed.scheduler.RedisScheduler',
+        'DUPEFILTER_CLASS': 'cola.distributed.dupefilter.AsyncRedisDupeFilter',
         'SCHEDULER_IDLE_TIMEOUT': 1.5,
         'SCHEDULER_POLL_TIMEOUT': 0.1,
         'SCHEDULER_PERSIST': False,
         'REDIS_DUPEFILTER_PERSIST': False,
-        'SEED_SOURCES': ['src.datasources.redis_source.RedisSeedProvider']
+        'SEED_SOURCES': ['cola.datasources.redis_source.RedisSeedProvider']
                         if role == 'master' else [],
-        'ITEM_PIPELINES': {'src.pipeline.redis_pipeline.RedisPipeline': 100},
+        'ITEM_PIPELINES': {'cola.pipeline.redis_pipeline.RedisPipeline': 100},
         'CONCURRENT_REQUESTS': 4,
         'TIMEOUT': 10,
         'MAX_RETRY': 1,

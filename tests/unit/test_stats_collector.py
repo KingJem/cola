@@ -3,7 +3,7 @@ Tests for the StatsCollector class.
 """
 import pytest
 from unittest.mock import Mock
-from src.stats_collector import StatsCollector
+from cola.stats_collector import StatsCollector
 
 
 class TestStatsCollectorBasics:

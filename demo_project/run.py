@@ -9,8 +9,8 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from src.crawler import CrawlerProcess
-from src.settings.settings_manager import SettingsManager
+from cola.crawler import CrawlerProcess
+from cola.settings.settings_manager import SettingsManager
 from demo_project.spiders.simple_spider import SimpleSpider
 from demo_project.spiders.quotes_spider import QuotesSpider
 

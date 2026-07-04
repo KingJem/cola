@@ -4,8 +4,8 @@ Tests for the Scheduler class.
 import pytest
 import asyncio
 from unittest.mock import Mock
-from src.core.scheduler import Scheduler
-from src.http.request import Request
+from cola.core.scheduler import Scheduler
+from cola.http.request import Request
 
 
 class TestSchedulerBasics:

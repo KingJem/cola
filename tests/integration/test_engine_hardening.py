@@ -6,12 +6,12 @@ import asyncio
 import pytest
 from aiohttp import web
 
-from src.crawler import Crawler
-from src.http.request import Request
-from src.settings.settings_manager import SettingsManager
-from src.spiders import Spider
+from cola.crawler import Crawler
+from cola.http.request import Request
+from cola.settings.settings_manager import SettingsManager
+from cola.spiders import Spider
 
-LOG_STATS = ['src.extension.log_stats.LogStats']
+LOG_STATS = ['cola.extension.log_stats.LogStats']
 
 
 @pytest.fixture
@@ -112,7 +112,7 @@ async def test_offsite_filter(server):
 
     stats = await run_crawl(SiteSpider, {
         'PROJECT_NAME': 'offsite_test',
-        'DOWNLOADER_MIDDLEWARES': {'src.middleware.offsite.Offsite': 50},
+        'DOWNLOADER_MIDDLEWARES': {'cola.middleware.offsite.Offsite': 50},
         'EXTENSIONS': LOG_STATS})
 
     assert stats.get_value('request_ignored_count', 0) == 1
