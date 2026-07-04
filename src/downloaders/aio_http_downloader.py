@@ -23,7 +23,7 @@ class AioHttpDownloader(Downloader):
 
     def open(self):
         super().open()
-        self.connector = TCPConnector(verify_ssl=self.verify_ssl)
+        self.connector = TCPConnector(ssl=None if self.verify_ssl else False)
         self.session = ClientSession(connector=self.connector)
         downloader_name = self.__class__.__name__
         self.logger.info(f"{self.crawler.spider} opened downloader: {downloader_name}")
@@ -58,14 +58,37 @@ class AioHttpDownloader(Downloader):
             logger.error(f"Download failed for {request.url}: {e}")
             raise  # 抛出异常以便重试机制捕获
 
+    @staticmethod
+    def _resolve_proxy(proxy) -> Optional[str]:
+        """aiohttp 的 proxy 参数是 URL 字符串;兼容文档中的 dict 写法
+        {'http': 'http://host:port'}(按 https/http 顺序取)。"""
+        if not proxy:
+            return None
+        if isinstance(proxy, str):
+            return proxy
+        if isinstance(proxy, dict):
+            return proxy.get('https') or proxy.get('http') \
+                or next(iter(proxy.values()), None)
+        return None
+
+    def _build_request_kwargs(self, request: Request) -> dict:
+        kwargs = dict(
+            method=request.method,
+            url=request.url,
+            headers=request.headers,
+            data=request.body,
+            timeout=self.timeout,
+        )
+        if request.cookies:
+            kwargs['cookies'] = request.cookies
+        proxy = self._resolve_proxy(request.proxy)
+        if proxy:
+            kwargs['proxy'] = proxy
+        return kwargs
+
     async def send_request(self, request: Request) -> Response:
         async with self.session.request(
-                method=request.method,
-                url=request.url,
-                headers=request.headers,
-                data=request.body,
-                timeout=self.timeout
-        ) as resp:
+                **self._build_request_kwargs(request)) as resp:
             body = await resp.read()
             return self.structure_response(resp, request, body)
 

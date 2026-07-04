@@ -74,23 +74,23 @@ class TestQueuePriority:
         queue = SpiderPriorityQueue()
         
         # Add requests with different priorities
-        high_priority = Request(url='https://example.com/high', priority=1)
-        low_priority = Request(url='https://example.com/low', priority=10)
+        high_priority = Request(url='https://example.com/high', priority=10)
+        low_priority = Request(url='https://example.com/low', priority=1)
         medium_priority = Request(url='https://example.com/medium', priority=5)
-        
+
         # Put in random order
         await queue.put(low_priority)
         await queue.put(high_priority)
         await queue.put(medium_priority)
-        
-        # Should come out in priority order (lowest number first)
+
+        # 文档语义:priority 越大越优先
         first = await queue.get()
         second = await queue.get()
         third = await queue.get()
-        
-        assert first.priority == 1
+
+        assert first.priority == 10
         assert second.priority == 5
-        assert third.priority == 10
+        assert third.priority == 1
     
     @pytest.mark.asyncio
     async def test_priority_with_many_items(self):
@@ -115,7 +115,7 @@ class TestQueuePriority:
                 retrieved.append(item)
         
         priorities = [req.priority for req in retrieved]
-        assert priorities == sorted(priorities)
+        assert priorities == sorted(priorities, reverse=True)
 
 
 class TestQueueTimeout:

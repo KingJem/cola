@@ -7,8 +7,9 @@ class RFPDupeFilter:
     """
     基于请求指纹（Request Fingerprint）的内存去重过滤器。
 
-    指纹算法：SHA1(METHOD + canonical_url)
+    指纹算法：SHA1(METHOD + canonical_url + body)
     - canonical_url：对 query string 参数排序后重建，去除 fragment
+    - body 参与指纹,避免同 URL 不同请求体的 POST 被误判重复
     进程重启后去重状态丢失（内存存储）。
     """
 
@@ -34,6 +35,11 @@ class RFPDupeFilter:
             '',  # 去掉 fragment
         ))
         raw = f"{request.method.upper()}{canonical}"
+        body = getattr(request, 'body', None)
+        if body:
+            if isinstance(body, str):
+                body = body.encode('utf-8')
+            raw += hashlib.sha1(body).hexdigest()
         return hashlib.sha1(raw.encode('utf-8')).hexdigest()
 
     def is_seen(self, request) -> bool:

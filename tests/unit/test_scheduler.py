@@ -155,24 +155,24 @@ class TestSchedulerPriority:
         
         scheduler = Scheduler(crawler)
         
-        # Lower priority number = higher priority
-        low_priority = Request(url='https://example.com/low', priority=10)
-        high_priority = Request(url='https://example.com/high', priority=1)
+        # 文档语义:priority 越大越优先
+        low_priority = Request(url='https://example.com/low', priority=1)
+        high_priority = Request(url='https://example.com/high', priority=10)
         medium_priority = Request(url='https://example.com/medium', priority=5)
-        
+
         # Enqueue in random order
         await scheduler.enqueue_request(low_priority)
         await scheduler.enqueue_request(high_priority)
         await scheduler.enqueue_request(medium_priority)
-        
+
         # Should come out in priority order
         first = await scheduler.next_request()
         second = await scheduler.next_request()
         third = await scheduler.next_request()
-        
-        assert first.priority == 1  # High priority first
+
+        assert first.priority == 10  # High priority first
         assert second.priority == 5  # Medium priority second
-        assert third.priority == 10  # Low priority last
+        assert third.priority == 1  # Low priority last
     
     @pytest.mark.asyncio
     async def test_mixed_priority_batch(self):
@@ -200,9 +200,9 @@ class TestSchedulerPriority:
             if req:
                 retrieved.append(req)
         
-        # Check that priorities are in ascending order
+        # priority 越大越先出队
         priorities = [req.priority for req in retrieved]
-        assert priorities == sorted(priorities)
+        assert priorities == sorted(priorities, reverse=True)
 
 
 class TestSchedulerLength:

@@ -280,13 +280,12 @@ stats.inc_value('items_count', 1)
 
 ## 📚 示例
 
-查看 `test/baidu/spiders/baidu.py` 获取完整示例。
+查看 `demo_project/spiders/quotes_spider.py` 获取完整示例。
 
 运行示例：
 
 ```bash
-cd test
-python run.py
+python demo_project/run.py
 ```
 
 ## 🔗 相关文档

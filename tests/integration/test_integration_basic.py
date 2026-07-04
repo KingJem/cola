@@ -191,9 +191,9 @@ class TestPriorityScheduling:
         
         scheduler = Scheduler(crawler)
         
-        # Create requests with different priorities
-        low_priority = Request(url='https://example.com/low', priority=10)
-        high_priority = Request(url='https://example.com/high', priority=1)
+        # 文档语义:priority 越大越优先
+        low_priority = Request(url='https://example.com/low', priority=1)
+        high_priority = Request(url='https://example.com/high', priority=10)
         medium_priority = Request(url='https://example.com/medium', priority=5)
         
         # Enqueue in non-priority order

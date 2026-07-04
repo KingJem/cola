@@ -14,6 +14,7 @@ class Request:
                  body: str = None,
                  callback: Callable = None,
                  dont_filter: bool = False,
+                 meta: dict = None,
                  ):
         self.url = url
         self.headers = headers
@@ -24,7 +25,7 @@ class Request:
         self.body = body
         self.callback = callback
         self.dont_filter = dont_filter
-        self.meta = {}
+        self.meta = dict(meta) if meta else {}
 
     def __lt__(self, other):
         return self.priority < other.priority

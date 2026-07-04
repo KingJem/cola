@@ -4,6 +4,7 @@ from typing import Optional, Generator, Callable, Union, AsyncGenerator
 
 from loguru import logger
 
+from src import event
 from src.core.process import Processor
 from src.core.request import Request
 from src.core.scheduler import Scheduler
@@ -113,9 +114,18 @@ class Engine:
 
     async def _crawl(self, request):
         async def crawl_task():
-            outputs = await self._fetch(request)
-            if outputs:
-                await self._handle_spider_outputs(outputs)
+            try:
+                outputs = await self._fetch(request)
+                if outputs:
+                    await self._handle_spider_outputs(outputs)
+            except Exception as exc:
+                # 单个回调异常不能杀掉任务且必须留痕
+                self.logger.exception(
+                    f"Spider callback error for {request.url}: {exc}")
+                self.crawler.stat_collector.inc_value(
+                    f'spider_exceptions/{type(exc).__name__}')
+                await self.crawler.subscriber.notify(
+                    event.spider_error, exc, self.spider)
 
         await self.task_manager.sem.acquire()
         self.task_manager.create_task(crawl_task())
@@ -157,6 +167,8 @@ class Engine:
 
         # 3b. 中间件 process_response 链
         response = await self.middleware_manager.process_response(request, response, self.spider)
+        await self.crawler.subscriber.notify(
+            event.response_received, response, self.spider)
 
         # 4. 调用 spider callback
         callback = request.callback or self.spider.parse
@@ -180,6 +192,8 @@ class Engine:
                 return
         await _maybe_await(self.dupe_filter.mark_seen(request))
         await self.scheduler.enqueue_request(request)
+        await self.crawler.subscriber.notify(
+            event.request_scheduled, request, self.spider)
 
     async def _get_next_request(self):
         return await self.scheduler.next_request()

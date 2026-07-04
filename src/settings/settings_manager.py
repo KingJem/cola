@@ -4,13 +4,22 @@ from copy import deepcopy
 
 from src.settings import default
 
+# 配置优先级:高优先级一旦写入,低优先级不能再覆盖同名键。
+# 运行时/CLI 下发的配置必须压过爬虫 custom_settings(平台管控的前提)。
+PRIORITY_DEFAULT = 0    # settings/default.py 框架默认
+PRIORITY_PROJECT = 10   # 项目级配置文件(预留)
+PRIORITY_SPIDER = 20    # Spider.custom_settings
+PRIORITY_RUNTIME = 30   # 运行时传入 / CLI / 热配置
+
 
 class SettingsManager(MutableMapping):
 
     def __init__(self, custom_settings: dict = None):
         self.attributes = dict()
-        self.set_setting(default)
-        self.update_values(custom_settings)
+        self._priorities = dict()
+        self.set_setting(default, priority=PRIORITY_DEFAULT)
+        # 构造传入的即"本次运行"的配置,优先级最高
+        self.update_values(custom_settings, priority=PRIORITY_RUNTIME)
 
     def __getitem__(self, item):
         if item in self.attributes:
@@ -26,9 +35,13 @@ class SettingsManager(MutableMapping):
 
     def __delitem__(self, key):
         del self.attributes[key]
+        self._priorities.pop(key, None)
 
-    def set(self, key, value):
+    def set(self, key, value, priority=PRIORITY_RUNTIME):
+        if priority < self._priorities.get(key, PRIORITY_DEFAULT):
+            return  # 已有更高优先级的值,忽略本次写入
         self.attributes[key] = value
+        self._priorities[key] = priority
 
     def get(self, key, default=None):
         return self.attributes.get(key, default)
@@ -65,18 +78,18 @@ class SettingsManager(MutableMapping):
             return value.split(',')
         return list(value)
 
-    def set_setting(self, module):
+    def set_setting(self, module, priority=PRIORITY_PROJECT):
         if isinstance(module, str):
             module = importlib.import_module(module)
 
         for key in dir(module):
             if key.isupper():
-                self.set(key, getattr(module, key))
+                self.set(key, getattr(module, key), priority=priority)
 
-    def update_values(self, custom_settings):
+    def update_values(self, custom_settings, priority=PRIORITY_RUNTIME):
         if custom_settings:
             for key, value in custom_settings.items():
-                self.set(key, value)
+                self.set(key, value, priority=priority)
 
     def __iter__(self):
         return iter(self.attributes)

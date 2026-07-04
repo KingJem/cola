@@ -49,7 +49,10 @@ class Crawler:
         self.spider = self.create_spider()
         if hasattr(self.spider, 'custom_settings'):
             custom_settings = getattr(self.spider, 'custom_settings', {})
-            self.settings.update(custom_settings)
+            # 爬虫级配置低于运行时传入的配置(平台/CLI 下发的必须生效)
+            from src.settings.settings_manager import PRIORITY_SPIDER
+            self.settings.update_values(custom_settings,
+                                        priority=PRIORITY_SPIDER)
         self.stat_collector = self.create_stat_collector()
         self._load_extensions()
         from src.pipeline import PipelineManager

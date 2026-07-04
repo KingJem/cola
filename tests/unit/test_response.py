@@ -476,14 +476,34 @@ class TestResponseEncoding:
         assert callable(resp.encoding)
     
     def test_encoding_method_call(self):
-        """Test calling encoding method."""
+        """无任何线索时回退 utf-8。"""
         resp = Response(
             url='https://example.com',
             status=200,
             headers={},
             body=b''
         )
-        
-        # Currently returns None as it's not fully implemented
-        result = resp.encoding()
-        assert result is None
+        assert resp.encoding() == 'utf-8'
+
+    def test_encoding_from_content_type(self):
+        resp = Response(
+            url='https://example.com', status=200,
+            headers={'Content-Type': 'text/html; charset=GBK'},
+            body='中文'.encode('gbk'))
+        assert resp.encoding() == 'gbk'
+        assert resp.text == '中文'
+
+    def test_encoding_from_meta_tag(self):
+        body = (b'<html><head><meta charset="gb2312"></head>'
+                b'<body>' + '内容'.encode('gb2312') + b'</body></html>')
+        resp = Response(url='https://example.com', status=200,
+                        headers={}, body=body)
+        assert resp.encoding() == 'gb2312'
+        assert '内容' in resp.text
+
+    def test_encoding_invalid_charset_falls_back(self):
+        resp = Response(
+            url='https://example.com', status=200,
+            headers={'Content-Type': 'text/html; charset=bogus-enc'},
+            body=b'hi')
+        assert resp.encoding() == 'utf-8'

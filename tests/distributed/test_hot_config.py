@@ -85,13 +85,13 @@ async def test_hot_config_pubsub_roundtrip(redis_client):
 
     await hc.spider_opened()
     try:
-        # 项目级频道
-        await redis_client.publish('cola_test:config',
-                                   json.dumps({'TIMEOUT': 99}))
-        # 爬虫级频道
-        await redis_client.publish('cola_test:DistTestSpider:config',
-                                   json.dumps({'MAX_RETRY': 7}))
-        for _ in range(50):
+        # SUBSCRIBE 与 PUBLISH 走不同连接,Redis 侧无顺序保证;
+        # 循环重发直到生效(幂等),避免订阅尚未注册导致的竞态
+        for _ in range(100):
+            await redis_client.publish('cola_test:config',
+                                       json.dumps({'TIMEOUT': 99}))
+            await redis_client.publish('cola_test:DistTestSpider:config',
+                                       json.dumps({'MAX_RETRY': 7}))
             if (crawler.settings.getint('TIMEOUT') == 99
                     and crawler.settings.getint('MAX_RETRY') == 7):
                 break
@@ -108,9 +108,10 @@ async def test_hot_config_ignores_bad_payload(redis_client):
     hc = HotConfig(crawler)
     await hc.spider_opened()
     try:
-        await redis_client.publish('cola_test:config', 'not-json')
-        await redis_client.publish('cola_test:config', json.dumps({'TIMEOUT': 42}))
-        for _ in range(50):
+        for _ in range(100):
+            await redis_client.publish('cola_test:config', 'not-json')
+            await redis_client.publish('cola_test:config',
+                                       json.dumps({'TIMEOUT': 42}))
             if crawler.settings.getint('TIMEOUT') == 42:
                 break
             await asyncio.sleep(0.05)
