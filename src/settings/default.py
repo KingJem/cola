@@ -22,6 +22,11 @@ DOWNLOADER_MIDDLEWARES = {}   # {class_path: priority}
 ITEM_PIPELINES = {}           # {class_path: priority}
 DUPEFILTER_CLASS = 'src.dupefilter.RFPDupeFilter'
 DUPEFILTER_DEBUG = False
+# RedisRFPDupeFilter settings.  Install with ``pip install cola[redis]`` and
+# set DUPEFILTER_CLASS to 'src.redis_dupefilter.RedisRFPDupeFilter' to enable.
+REDIS_URL = 'redis://localhost:6379/0'
+REDIS_DUPEFILTER_KEY = None
+REDIS_DUPEFILTER_PERSIST = True
 JSON_FEED_URI = 'output.jl'
 CSV_FEED_URI = 'output.csv'
 

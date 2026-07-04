@@ -147,6 +147,23 @@ settings = SettingsManager({
 })
 ```
 
+### 多机 Redis 去重
+
+多个 Worker 使用同一个 Redis key 时，请求指纹通过 Redis 的原子 `SADD`
+去重；每个 Worker 仍由自己的 `CONCURRENT_REQUESTS` 限制协程数。
+
+```bash
+pip install 'cola[redis]'
+```
+
+```python
+DUPEFILTER_CLASS = 'src.redis_dupefilter.RedisRFPDupeFilter'
+REDIS_URL = 'redis://redis:6379/0'
+REDIS_DUPEFILTER_KEY = 'my-project:dupefilter'
+# 保持 True，避免任一 Worker 结束时清空所有节点共用的去重集合。
+REDIS_DUPEFILTER_PERSIST = True
+```
+
 ## 🎯 高级用法
 
 ### 优先级队列
