@@ -19,6 +19,24 @@ dependencies = [
 redis = [
     "redis>=5.0.0",
 ]
+mysql = [
+    "aiomysql>=0.2.0",
+    # MySQL 8+ 默认 caching_sha2_password 认证需要
+    "cryptography>=42.0.0",
+]
+postgres = [
+    "asyncpg>=0.29.0",
+]
+rabbitmq = [
+    "aio-pika>=9.4.0",
+]
+all = [
+    "redis>=5.0.0",
+    "aiomysql>=0.2.0",
+    "cryptography>=42.0.0",
+    "asyncpg>=0.29.0",
+    "aio-pika>=9.4.0",
+]
 dev = [
     "pytest>=7.4.0",
     "pytest-asyncio>=0.21.0",

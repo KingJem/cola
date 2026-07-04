@@ -164,6 +164,58 @@ REDIS_DUPEFILTER_KEY = 'my-project:dupefilter'
 REDIS_DUPEFILTER_PERSIST = True
 ```
 
+## 🌐 分布式主从架构
+
+完整设计见 [docs/DISTRIBUTED_DESIGN.md](docs/DISTRIBUTED_DESIGN.md)。
+所有节点运行同一份 Spider 代码,差别只在 settings:
+
+```python
+# master 节点:从数据源读种子,写入共享 Redis 队列,同时参与消费
+master_settings = {
+    'PROJECT_NAME': 'myproj',
+    'NODE_ROLE': 'master',
+    'REDIS_URL': 'redis://redis:6379/0',
+    'SCHEDULER_CLASS': 'src.distributed.scheduler.RedisScheduler',
+    'DUPEFILTER_CLASS': 'src.distributed.dupefilter.AsyncRedisDupeFilter',
+    # 种子来源(可多个):redis / mysql / postgres / doris / rabbitmq
+    'SEED_SOURCES': ['src.datasources.mysql_source.MySQLSeedProvider'],
+    'SEED_SQL': 'SELECT url, category FROM seeds WHERE status = 0',
+    'MYSQL_HOST': 'mysql', 'MYSQL_DB': 'crawler',
+    'MYSQL_USER': 'root', 'MYSQL_PASSWORD': '***',
+    # 结果存储(可多个):redis / mysql / postgres / doris / rabbitmq
+    'ITEM_PIPELINES': {'src.pipeline.mysql_pipeline.MySQLPipeline': 300},
+    'MYSQL_TABLE': 'results',
+}
+
+# worker 节点:跳过 start_requests,只消费共享队列
+worker_settings = {
+    **master_settings,
+    'NODE_ROLE': 'worker',
+    'SEED_SOURCES': [],
+    'SCHEDULER_IDLE_TIMEOUT': 0,   # 常驻;>0 表示空闲 N 秒后自动退出
+}
+```
+
+种子协议:URL 字符串或 JSON 对象
+`{"url": "...", "callback": "parse_detail", "priority": 5, "meta": {...}}`;
+关系型数据源(`SEED_SQL`)行内 `url` 列必填,其余列自动进入 `request.meta`。
+
+## 🔥 热配置更新
+
+```python
+settings = {'HOT_CONFIG_ENABLED': True}   # 自动挂载 HotConfig 扩展
+```
+
+运行中发布配置(项目级或爬虫级频道):
+
+```bash
+redis-cli PUBLISH 'myproj:config' '{"CONCURRENT_REQUESTS": 32}'
+redis-cli PUBLISH 'myproj:MySpider:config' '{"DOWNLOAD_DELAY": 0.5}'
+```
+
+`CONCURRENT_REQUESTS` 即时调整并发信号量;`DOWNLOAD_DELAY`/`RANDOMNESS`
+由中间件每次请求动态读取。
+
 ## 🎯 高级用法
 
 ### 优先级队列

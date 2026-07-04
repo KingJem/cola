@@ -40,19 +40,24 @@ class SettingsManager(MutableMapping):
         return float(self.get(key, default))
 
     def getboolean(self, key, default=False):
-        got = self.get(key, default) or self.get(key.lower(), default)
+        # 注意:不能用 or 串联,否则显式的 False 会穿透到默认值
+        got = self.get(key, None)
+        if got is None:
+            got = self.get(key.lower(), None)
+        if got is None:
+            got = default
+        if isinstance(got, str):
+            if got.lower() == "true":
+                return True
+            if got.lower() == "false":
+                return False
         try:
             return bool(int(got))
-        except ValueError:
-            if isinstance(got, str) and got.lower() == "true":
-                return True
-            if isinstance(got, str) and got.lower() == "false":
-                return False
-            # todo error message
-            raise ValueError(got)
+        except (ValueError, TypeError):
+            raise ValueError(f"无法解析布尔配置 {key}={got!r}")
 
     def getbool(self, key, default=False):
-        return self.getboolean(key, default) or self.getboolean(key.lower(), default)
+        return self.getboolean(key, default)
 
     def getlist(self, key, default=None):
         value = self.get(key, default or [])

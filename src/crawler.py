@@ -4,10 +4,14 @@ from datetime import datetime
 from signal import SIGINT
 from typing import Type, Final, Set, Optional
 
+from src import event
 from src.core.engine import Engine
 from src.settings.settings_manager import SettingsManager
 from src.spiders import Spider
 from src.stats_collector import StatsCollector
+from src.subscriber import Subscriber
+
+HOT_CONFIG_EXTENSION = 'src.extension.hot_config.HotConfig'
 
 
 class Crawler:
@@ -18,6 +22,13 @@ class Crawler:
         self.settings: SettingsManager = settings.copy()
         self.stat_collector: Optional[StatsCollector] = None
         self.pipeline_manager = None
+        self.subscriber = Subscriber()
+        self.extension_manager = None
+
+    @property
+    def stats(self):
+        """扩展(LogStats/LogInterval)通过 crawler.stats 访问统计收集器。"""
+        return self.stat_collector
 
     def create_spider(self) -> Spider:
         spider = self.spider_cls.create_instance(self)
@@ -40,10 +51,21 @@ class Crawler:
             custom_settings = getattr(self.spider, 'custom_settings', {})
             self.settings.update(custom_settings)
         self.stat_collector = self.create_stat_collector()
+        self._load_extensions()
         from src.pipeline import PipelineManager
         self.pipeline_manager = PipelineManager(self)
         await self.pipeline_manager.open_spider(self.spider)
+        await self.subscriber.notify(event.spider_opened)
         await self.engine.start_spider(self.spider)
+
+    def _load_extensions(self):
+        extensions = list(self.settings.getlist('EXTENSIONS') or [])
+        if (self.settings.getbool('HOT_CONFIG_ENABLED')
+                and HOT_CONFIG_EXTENSION not in extensions):
+            extensions.append(HOT_CONFIG_EXTENSION)
+        self.settings.set('EXTENSIONS', extensions)
+        from src.extension import ExtensionManager
+        self.extension_manager = ExtensionManager(self)
 
     def _set_spider(self):
         self.merge_settings()
@@ -54,6 +76,9 @@ class Crawler:
             self.settings.update_values(custom_settings)
 
     async def close(self, reason='finished'):
+        await self.subscriber.notify(event.spider_closed)
+        # notify 是任务派发;让出一个事件循环 tick,使无内部 await 的接收者跑完
+        await asyncio.sleep(0)
         if self.pipeline_manager:
             await self.pipeline_manager.close_spider(self.spider)
         self.stat_collector['end_time'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')

@@ -13,6 +13,13 @@ from src.task_manager import TaskManager
 from src.utils import load_class
 
 
+async def _maybe_await(result):
+    """兼容同步/异步组件方法(如去重器的 is_seen/mark_seen)。"""
+    if inspect.isawaitable(result):
+        return await result
+    return result
+
+
 class Engine:
 
     def __init__(self, crawler):
@@ -27,6 +34,7 @@ class Engine:
         self.task_manager = TaskManager(self.settings)
         self.dupe_filter = None
         self.middleware_manager = None
+        self.seed_task: Optional[asyncio.Task] = None
         self.logger = logger
 
     async def start_spider(self, spider):
@@ -35,16 +43,28 @@ class Engine:
         self.logger.info(f"Concurrent Requests: {self.settings.get('CONCURRENT_REQUESTS')}")
         self.spider = spider
         self.running = True
-        self.scheduler = Scheduler(self.crawler)
+        self.scheduler = self.get_scheduler()
         self.processor = Processor(self.crawler)
         self.downloader = self.get_downloader()
-        self.start_requests = iter(spider.start_requests())
+        node_role = self.settings.get('NODE_ROLE', 'standalone')
+        if node_role == 'worker':
+            # worker 只消费共享队列,种子由 master 注入
+            self.start_requests = iter(())
+        else:
+            self.start_requests = iter(spider.start_requests())
         dupefilter_cls_path = self.settings.get('DUPEFILTER_CLASS', 'src.dupefilter.RFPDupeFilter')
         dupefilter_cls = load_class(dupefilter_cls_path)
         self.dupe_filter = dupefilter_cls.from_crawler(self.crawler)
         from src.middlewares import MiddlewareManager
         self.middleware_manager = MiddlewareManager(self.crawler)
         await self.open_spider()
+
+    def get_scheduler(self):
+        scheduler_path = self.settings.get(
+            'SCHEDULER_CLASS', 'src.core.scheduler.Scheduler')
+        scheduler_cls = load_class(scheduler_path)
+        self.logger.info(f"Current scheduler is: {scheduler_path}")
+        return scheduler_cls(self.crawler)
 
     def get_downloader(self):
         downloader: str = self.settings.get('DOWNLOADER_CLASS')
@@ -56,8 +76,20 @@ class Engine:
 
     async def open_spider(self):
         await self.open()
+        self._start_seed_loader()
         crawling = asyncio.create_task(self.crawl())
         await crawling
+
+    def _start_seed_loader(self):
+        if self.settings.get('NODE_ROLE', 'standalone') != 'master':
+            return
+        if not self.settings.getlist('SEED_SOURCES'):
+            return
+        from src.distributed.seed_loader import SeedLoader
+        loader = SeedLoader(self.crawler)
+        self.seed_task = asyncio.create_task(loader.run(self))
+        self.logger.info(
+            f"SeedLoader started with {len(loader.providers)} provider(s)")
 
     async def crawl(self):
         while self.running:
@@ -65,17 +97,17 @@ class Engine:
             if request:
                 await self._crawl(request)
             else:
-                try:
-                    start_request = next(self.start_requests)  # noqa
-                    await self.enqueue_requests(start_request)
-                except StopIteration:
-                    self.start_requests = None
-                    if self._exit():
-                        break
-                except Exception as e:
-                    logger.error(f"Error getting start request: {e}")
-                    if self._exit():
-                        break
+                if self.start_requests is not None:
+                    try:
+                        start_request = next(self.start_requests)  # noqa
+                        await self.enqueue_requests(start_request)
+                    except StopIteration:
+                        self.start_requests = None
+                    except Exception as e:
+                        logger.error(f"Error getting start request: {e}")
+                        self.start_requests = None
+                if self.start_requests is None and self._exit():
+                    break
         if not self.running:
             await self.close()
 
@@ -140,11 +172,13 @@ class Engine:
         await self._schedule_request(request)
 
     async def _schedule_request(self, request):
-        if not request.dont_filter and self.dupe_filter.is_seen(request):
-            if self.dupe_filter.debug:
-                self.logger.debug(f"Filtered duplicate request: {request.url}")
-            return
-        self.dupe_filter.mark_seen(request)
+        if not request.dont_filter:
+            seen = await _maybe_await(self.dupe_filter.is_seen(request))
+            if seen:
+                if self.dupe_filter.debug:
+                    self.logger.debug(f"Filtered duplicate request: {request.url}")
+                return
+        await _maybe_await(self.dupe_filter.mark_seen(request))
         await self.scheduler.enqueue_request(request)
 
     async def _get_next_request(self):
@@ -166,9 +200,11 @@ class Engine:
 
     def _exit(self):
         # 修复逻辑：所有条件都必须满足才能退出
-        if (self.scheduler.idle() and 
-            self.task_manager.all_done() and 
-            self.processor.idle() and 
+        if self.seed_task is not None and not self.seed_task.done():
+            return False
+        if (self.scheduler.idle() and
+            self.task_manager.all_done() and
+            self.processor.idle() and
             self.downloader.idle()):
             self.running = False
             return True
@@ -176,13 +212,16 @@ class Engine:
 
     async def close(self):
         self.running = False
+        if self.seed_task is not None and not self.seed_task.done():
+            self.seed_task.cancel()
+            await asyncio.gather(self.seed_task, return_exceptions=True)
         await self.__close(self.scheduler)
         await self.__close(self.processor)
         if self.task_manager.current_task:
             await asyncio.gather(*self.task_manager.current_task, return_exceptions=True)
         await self.__close(self.downloader)
         if self.dupe_filter is not None:
-            self.dupe_filter.close()
+            await self.__close(self.dupe_filter)
         await self.crawler.close()
 
     @staticmethod

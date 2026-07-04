@@ -8,11 +8,10 @@ from src.utils.log import get_logger
 class DownloadDelay:
 
     def __init__(self, settings, log_level):
-        self.delay = settings.getfloat("DOWNLOAD_DELAY")
-        if not self.delay:
+        # 每次请求动态读取 settings,支持热配置更新 DOWNLOAD_DELAY / RANDOMNESS
+        self.settings = settings
+        if not settings.getfloat("DOWNLOAD_DELAY"):
             raise NotConfigured()
-        self.randomness = settings.getbool("RANDOMNESS")
-        self.floor, self.upper = settings.getlist("RANDOM_RANGE")
 
         self.logger = get_logger(self.__class__.__name__, log_level)
 
@@ -25,7 +24,11 @@ class DownloadDelay:
         return o
 
     async def process_request(self, _request, _spider):
-        if self.randomness:
-            await sleep(uniform(self.delay * self.floor, self.delay * self.upper))
+        delay = self.settings.getfloat("DOWNLOAD_DELAY")
+        if not delay:
+            return
+        if self.settings.getbool("RANDOMNESS"):
+            floor, upper = self.settings.getlist("RANDOM_RANGE")
+            await sleep(uniform(delay * float(floor), delay * float(upper)))
         else:
-            await sleep(self.delay)
+            await sleep(delay)
