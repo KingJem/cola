@@ -228,6 +228,25 @@ worker_settings = {
 `{"url": "...", "callback": "parse_detail", "priority": 5, "meta": {...}}`;
 关系型数据源(`SEED_SQL`)行内 `url` 列必填,其余列自动进入 `request.meta`。
 
+### 自定义种子转换(make_request_from_seed)
+
+所有种子源(redis/mysql/pg/doris/rabbitmq)统一经 Spider 的
+`make_request_from_seed(seed)` 钩子转成 Request,重写它即可完全掌控转换,
+例如把整个 task 放进 `request.meta`:
+
+```python
+class MySpider(Spider):
+    def make_request_from_seed(self, seed):
+        # seed 是 URL 字符串或已解析的 dict
+        return Request(seed['url'], callback=self.parse, meta={'task': seed})
+
+    async def parse(self, response):
+        task = response.meta['task']   # 拿到完整原始 task
+        ...
+```
+
+返回 `None` 可跳过该种子。不重写时默认按上面的种子协议处理。
+
 ## 🔥 热配置更新
 
 ```python

@@ -52,7 +52,6 @@ class SeedLoader:
     def __init__(self, crawler):
         self.crawler = crawler
         self.settings = crawler.settings
-        self.default_callback = self.settings.get('SEED_CALLBACK')
         self.providers = []
         for path in self.settings.getlist('SEED_SOURCES'):
             provider_cls = load_class(path)
@@ -69,12 +68,17 @@ class SeedLoader:
             try:
                 await provider.open()
                 async for seed in provider.seeds():
+                    # 统一走 spider 钩子;默认委托 seed_to_request,子类可重写
                     try:
-                        request = seed_to_request(
-                            seed, self.crawler.spider,
-                            default_callback=self.default_callback)
+                        request = self.crawler.spider.make_request_from_seed(seed)
                     except ValueError as exc:
                         logger.error(f"[{name}] 丢弃非法种子: {exc}")
+                        continue
+                    except Exception as exc:
+                        logger.error(
+                            f"[{name}] make_request_from_seed 异常,丢弃种子: {exc}")
+                        continue
+                    if request is None:
                         continue
                     await engine.enqueue_requests(request)
                     total += 1
