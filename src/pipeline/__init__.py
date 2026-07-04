@@ -12,6 +12,7 @@ from typing import List, Optional
 
 from loguru import logger
 
+from src import event
 from src.pipeline.base import BasePipeline, DropItem
 from src.utils import load_class
 
@@ -69,11 +70,17 @@ class PipelineManager:
         """
         依次通过所有 Pipeline 处理 item。
         若某 Pipeline 抛出 DropItem，停止链并返回 None。
+        成功/丢弃分别派发 item_successful / item_discard 事件(供 LogStats)。
         """
+        subscriber = getattr(self.crawler, 'subscriber', None)
         for pipeline in self.pipelines:
             try:
                 item = await _call_maybe_async(pipeline.process_item, item, spider)
             except DropItem as e:
                 logger.info(f"Item dropped by {type(pipeline).__name__}: {e}")
+                if subscriber is not None:
+                    await subscriber.notify(event.item_discard, item, e, spider)
                 return None
+        if subscriber is not None:
+            await subscriber.notify(event.item_successful, item, spider)
         return item

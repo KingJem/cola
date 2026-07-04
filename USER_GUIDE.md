@@ -120,10 +120,38 @@ yield item
 
 ```python
 PROJECT_NAME = 'test'
-CONCURRENT_REQUESTS = 16      # 并发数
-TIMEOUT = 30                  # 超时
-MAX_RETRY = 3                 # 重试次数
-VERIFY_SSL = False            # SSL验证
+CONCURRENT_REQUESTS = 16              # 全局并发数
+CONCURRENT_REQUESTS_PER_DOMAIN = 0   # 每域名并发上限(0 不限)
+TIMEOUT = 30                         # 请求超时
+VERIFY_SSL = False                   # SSL 验证
+DOWNLOAD_MAXSIZE = 0                 # 响应体字节上限(0 不限)
+DEPTH_LIMIT = 0                      # 爬取深度上限(种子为 0;0 不限)
+LOG_FILE = None                      # 追加日志文件
+
+# 重试(由 Retry 中间件统一负责)
+MAX_RETRY_TIMES = 3
+RETRY_HTTP_CODES = [408, 429, 500, 502, 503, 504, 522, 524]
+```
+
+### 重试、限流与过滤
+
+重试由 `src.middleware.retry.Retry` 中间件负责(默认启用):命中
+`RETRY_HTTP_CODES` 的响应或网络异常会重新入队,超过 `MAX_RETRY_TIMES`
+放弃;单请求可 `request.meta['dont_retry'] = True` 关闭。
+
+```python
+DOWNLOADER_MIDDLEWARES = {
+    'src.middleware.retry.Retry': 100,
+    'src.middleware.offsite.Offsite': 50,   # 按 spider.allowed_domains 过滤
+}
+
+class MySpider(Spider):
+    allowed_domains = ['example.com']       # 仅抓本域及子域
+    custom_settings = {
+        'CONCURRENT_REQUESTS_PER_DOMAIN': 2,
+        'DEPTH_LIMIT': 3,
+        'DOWNLOAD_MAXSIZE': 10 * 1024 * 1024,
+    }
 ```
 
 ### 自定义配置

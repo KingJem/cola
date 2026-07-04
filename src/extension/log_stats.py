@@ -36,6 +36,6 @@ class LogStats:
 
     async def item_discard(self, _item, exception, _spider):
         self._stats.inc_value("item_discard_count")
-        reason = exception.msg
+        reason = getattr(exception, 'msg', None) or str(exception)
         if reason:
             self._stats.inc_value(f"item_discard/{reason}")

@@ -30,6 +30,21 @@ class Request:
     def __lt__(self, other):
         return self.priority < other.priority
 
+    def copy(self) -> "Request":
+        request = Request(
+            url=self.url,
+            headers=dict(self.headers) if self.headers else None,
+            priority=self.priority,
+            method=self.method,
+            cookies=dict(self.cookies) if self.cookies else None,
+            proxy=self.proxy,
+            body=self.body,
+            callback=self.callback,
+            dont_filter=self.dont_filter,
+            meta=dict(self.meta),
+        )
+        return request
+
     def encoding(self):
         """获取请求的编码（占位方法，暂未实现）"""
         return None

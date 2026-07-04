@@ -1,15 +1,25 @@
+from asyncio import Semaphore
+from collections import defaultdict
 from typing import Optional
+from urllib.parse import urlparse
 
 from aiohttp import ClientSession, ClientResponse, TCPConnector
 from loguru import logger
 
 from src.downloaders import AsyncDownloaderManager
 from src.downloaders import Downloader
+from src.exceptions import DownloadMaxsizeExceeded
 from src.http.request import Request
 from src.http.response import Response
 
 
 class AioHttpDownloader(Downloader):
+    """aiohttp 下载器:单次请求,失败原样抛出(重试由 Retry 中间件负责)。
+
+    可选限制:
+        CONCURRENT_REQUESTS_PER_DOMAIN  每域名并发上限(0 不限)
+        DOWNLOAD_MAXSIZE                响应体字节上限(0 不限)
+    """
 
     def __init__(self, crawler):
         super().__init__(crawler)
@@ -18,7 +28,11 @@ class AioHttpDownloader(Downloader):
         self.active_downloader = AsyncDownloaderManager()
         self.verify_ssl = self.crawler.settings.getbool("VERIFY_SSL")
         self.timeout = self.crawler.settings.getint("TIMEOUT")
-        self.max_retry = self.crawler.settings.getint("MAX_RETRY", 3)
+        self.maxsize = self.crawler.settings.getint("DOWNLOAD_MAXSIZE", 0)
+        per_domain = self.crawler.settings.getint(
+            "CONCURRENT_REQUESTS_PER_DOMAIN", 0)
+        self._domain_limit = per_domain
+        self._domain_sems = defaultdict(lambda: Semaphore(per_domain))
         self.logger = logger
 
     def open(self):
@@ -30,33 +44,15 @@ class AioHttpDownloader(Downloader):
 
     async def fetch(self, request: Request) -> Optional[Response]:
         async with self.active_downloader(request):
-            response = await self.download_with_retry(request)
-            return response
-
-    async def download_with_retry(self, request: Request) -> Optional[Response]:
-        """带重试机制的下载"""
-        last_exception = None
-        for attempt in range(self.max_retry + 1):
-            try:
-                response = await self.download(request)
-                if response is not None:
-                    return response
-            except Exception as e:
-                last_exception = e
-                if attempt < self.max_retry:
-                    self.logger.warning(f"Download attempt {attempt + 1}/{self.max_retry + 1} failed for {request.url}: {e}")
-                else:
-                    self.logger.error(f"All download attempts failed for {request.url}: {e}")
-        return None
+            if self._domain_limit:
+                host = urlparse(request.url).hostname or ''
+                async with self._domain_sems[host]:
+                    return await self.download(request)
+            return await self.download(request)
 
     async def download(self, request: Request):
-        try:
-            logger.debug(f"Request downloading {request.url} method={request.method}")
-            response = await self.send_request(request)
-            return response
-        except Exception as e:
-            logger.error(f"Download failed for {request.url}: {e}")
-            raise  # 抛出异常以便重试机制捕获
+        logger.debug(f"Request downloading {request.url} method={request.method}")
+        return await self.send_request(request)
 
     @staticmethod
     def _resolve_proxy(proxy) -> Optional[str]:
@@ -89,7 +85,17 @@ class AioHttpDownloader(Downloader):
     async def send_request(self, request: Request) -> Response:
         async with self.session.request(
                 **self._build_request_kwargs(request)) as resp:
+            if self.maxsize:
+                length = resp.headers.get('Content-Length')
+                if length and int(length) > self.maxsize:
+                    raise DownloadMaxsizeExceeded(
+                        f'{request.url} Content-Length {length} '
+                        f'> DOWNLOAD_MAXSIZE {self.maxsize}')
             body = await resp.read()
+            if self.maxsize and len(body) > self.maxsize:
+                raise DownloadMaxsizeExceeded(
+                    f'{request.url} body {len(body)} bytes '
+                    f'> DOWNLOAD_MAXSIZE {self.maxsize}')
             return self.structure_response(resp, request, body)
 
     @staticmethod

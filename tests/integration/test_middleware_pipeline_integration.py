@@ -17,9 +17,11 @@ def make_response(url='http://example.com/', status=200):
 
 
 def make_crawler_with_settings(**settings_dict):
+    from src.subscriber import Subscriber
     crawler = MagicMock()
     crawler.settings.get.side_effect = lambda key, default=None: settings_dict.get(key, default)
     crawler.settings.getbool.side_effect = lambda key, default=False: settings_dict.get(key, default)
+    crawler.subscriber = Subscriber()
     return crawler
 
 

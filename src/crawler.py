@@ -54,12 +54,22 @@ class Crawler:
             self.settings.update_values(custom_settings,
                                         priority=PRIORITY_SPIDER)
         self.stat_collector = self.create_stat_collector()
+        self._setup_log_file()
         self._load_extensions()
         from src.pipeline import PipelineManager
         self.pipeline_manager = PipelineManager(self)
         await self.pipeline_manager.open_spider(self.spider)
         await self.subscriber.notify(event.spider_opened)
         await self.engine.start_spider(self.spider)
+
+    def _setup_log_file(self):
+        log_file = self.settings.get('LOG_FILE')
+        if not log_file:
+            return
+        from loguru import logger
+        logger.add(log_file,
+                   level=self.settings.get('LOG_LEVEL') or 'INFO',
+                   encoding='utf-8', enqueue=True)
 
     def _load_extensions(self):
         extensions = list(self.settings.getlist('EXTENSIONS') or [])
@@ -79,9 +89,10 @@ class Crawler:
             self.settings.update_values(custom_settings)
 
     async def close(self, reason='finished'):
+        # 先排空爬取期间派发的事件(item_successful 等),再收尾统计
+        await self.subscriber.drain()
         await self.subscriber.notify(event.spider_closed)
-        # notify 是任务派发;让出一个事件循环 tick,使无内部 await 的接收者跑完
-        await asyncio.sleep(0)
+        await self.subscriber.drain()
         if self.pipeline_manager:
             await self.pipeline_manager.close_spider(self.spider)
         self.stat_collector['end_time'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')

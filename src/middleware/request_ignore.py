@@ -20,12 +20,7 @@ class RequestIgnore:
 
     async def request_ignore(self, exc, request, _spider):
         self.logger.info(f"{request} ignored.")
-        self.stats.inc_value(f"request_ignore_count")
-        reason = exc.msg
+        self.stats.inc_value("request_ignore_count")
+        reason = getattr(exc, 'msg', '')
         if reason:
             self.stats.inc_value(f"request_ignore_count/{reason}")
-
-    @staticmethod
-    def process_exception(_request, exc, _spider):
-        if isinstance(exc, IgnoreRequest):
-            return True

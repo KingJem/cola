@@ -91,10 +91,13 @@ class MiddlewareManager:
         """
         按优先级逆序执行 process_response。
         - 返回 Response：继续下一个中间件
-        - 返回 Request：重新入队下载
+        - 返回 Request：短路返回,由引擎重新入队(后续中间件不再执行)
         """
+        from src.http.request import Request
         for method in reversed(self._methods['process_response']):
             response = await _call_maybe_async(method, request, response, spider)
+            if isinstance(response, Request):
+                return response
         return response
 
     async def process_exception(self, request, exception, spider):

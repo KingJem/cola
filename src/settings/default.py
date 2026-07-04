@@ -14,11 +14,29 @@ VERIFY_SSL = False
 
 TIMEOUT = 30
 
-MAX_RETRY = 3
-
 LOG_LEVEL = 'INFO'
+# 追加日志文件(loguru sink);None 只输出到 stderr
+LOG_FILE = None
 
-DOWNLOADER_MIDDLEWARES = {}   # {class_path: priority}
+# ---- 重试(由 Retry 中间件统一负责,下载器本身只请求一次)----
+MAX_RETRY_TIMES = 3
+RETRY_HTTP_CODES = [408, 429, 500, 502, 503, 504, 522, 524]
+IGNORE_HTTP_CODES = []
+RETRY_EXCEPTIONS = []          # 额外的可重试异常类
+RETRY_PRIORITY = -1            # 重试请求的优先级偏移
+
+# 每域名并发上限;0 = 不限制(仅受全局 CONCURRENT_REQUESTS 约束)
+CONCURRENT_REQUESTS_PER_DOMAIN = 0
+# 响应体大小上限(字节);0 = 不限制
+DOWNLOAD_MAXSIZE = 0
+# 爬取深度上限(种子为 0);0 = 不限制
+DEPTH_LIMIT = 0
+# Processor 队列长度(满时反压解析协程)
+PROCESSOR_QUEUE_SIZE = 128
+
+DOWNLOADER_MIDDLEWARES = {   # {class_path: priority}
+    'src.middleware.retry.Retry': 100,
+}
 ITEM_PIPELINES = {}           # {class_path: priority}
 DUPEFILTER_CLASS = 'src.dupefilter.RFPDupeFilter'
 DUPEFILTER_DEBUG = False

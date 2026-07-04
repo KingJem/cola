@@ -15,10 +15,13 @@ def make_item(**kwargs):
 
 
 def make_crawler(pipelines=None):
+    from src.subscriber import Subscriber
     crawler = MagicMock()
     crawler.settings.get.return_value = pipelines or {}
     crawler.spider = MagicMock()
     crawler.spider.name = 'test_spider'
+    # 真实 Subscriber,使 process_item 里的事件派发可 await(无订阅者即空转)
+    crawler.subscriber = Subscriber()
     return crawler
 
 

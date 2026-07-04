@@ -36,6 +36,7 @@ class Engine:
         self.dupe_filter = None
         self.middleware_manager = None
         self.seed_task: Optional[asyncio.Task] = None
+        self.start_task: Optional[asyncio.Task] = None
         self.logger = logger
 
     async def start_spider(self, spider):
@@ -78,8 +79,23 @@ class Engine:
     async def open_spider(self):
         await self.open()
         self._start_seed_loader()
+        # start_requests 由独立任务喂入,不再依赖主循环"队列空"时才消费,
+        # 避免队列繁忙时起始请求长期饥饿
+        self.start_task = asyncio.create_task(self._feed_start_requests())
         crawling = asyncio.create_task(self.crawl())
         await crawling
+
+    async def _feed_start_requests(self):
+        if self.start_requests is None:
+            return
+        try:
+            for start_request in self.start_requests:
+                await self.enqueue_requests(start_request)
+                await asyncio.sleep(0)
+        except Exception as e:
+            logger.error(f"Error feeding start requests: {e}")
+        finally:
+            self.start_requests = None
 
     def _start_seed_loader(self):
         if self.settings.get('NODE_ROLE', 'standalone') != 'master':
@@ -97,18 +113,8 @@ class Engine:
             request = await self._get_next_request()
             if request:
                 await self._crawl(request)
-            else:
-                if self.start_requests is not None:
-                    try:
-                        start_request = next(self.start_requests)  # noqa
-                        await self.enqueue_requests(start_request)
-                    except StopIteration:
-                        self.start_requests = None
-                    except Exception as e:
-                        logger.error(f"Error getting start request: {e}")
-                        self.start_requests = None
-                if self.start_requests is None and self._exit():
-                    break
+            elif self._exit():
+                break
         if not self.running:
             await self.close()
 
@@ -117,7 +123,7 @@ class Engine:
             try:
                 outputs = await self._fetch(request)
                 if outputs:
-                    await self._handle_spider_outputs(outputs)
+                    await self._handle_spider_outputs(outputs, request)
             except Exception as exc:
                 # 单个回调异常不能杀掉任务且必须留痕
                 self.logger.exception(
@@ -142,8 +148,14 @@ class Engine:
             raise Exception('TypeError')
 
     async def _fetch(self, request):
-        # 1. 中间件 process_request 链
-        result = await self.middleware_manager.process_request(request, self.spider)
+        from src.exceptions import IgnoreRequest
+
+        # 1. 中间件 process_request 链(可抛 IgnoreRequest 丢弃请求)
+        try:
+            result = await self.middleware_manager.process_request(request, self.spider)
+        except IgnoreRequest as exc:
+            await self._on_request_ignored(exc, request)
+            return None
 
         from src.http.response import Response as HttpResponse
         if isinstance(result, HttpResponse):
@@ -151,22 +163,34 @@ class Engine:
         else:
             if isinstance(result, Request):
                 request = result  # 中间件返回了修改后的 Request
-            # 2. 实际下载
+            # 2. 实际下载(单次;重试由 Retry 中间件决定)
             try:
                 response = await self.downloader.fetch(request)
                 if response is None:
                     logger.warning(f"Download failed for {request.url}, skipping")
                     return None
+            except IgnoreRequest as exc:
+                await self._on_request_ignored(exc, request)
+                return None
             except Exception as e:
                 # 3a. 中间件 process_exception 链
                 exc_result = await self.middleware_manager.process_exception(request, e, self.spider)
                 if exc_result is None:
                     logger.error(f"Unhandled download exception for {request.url}: {e}")
+                    self.crawler.stat_collector.inc_value(
+                        f'download_exceptions/{type(e).__name__}')
+                    return None
+                if isinstance(exc_result, Request):
+                    # 中间件要求重新调度(如 Retry)
+                    await self.enqueue_requests(exc_result)
                     return None
                 response = exc_result
 
-        # 3b. 中间件 process_response 链
+        # 3b. 中间件 process_response 链(返回 Request 表示重新入队,如状态码重试)
         response = await self.middleware_manager.process_response(request, response, self.spider)
+        if isinstance(response, Request):
+            await self.enqueue_requests(response)
+            return None
         await self.crawler.subscriber.notify(
             event.response_received, response, self.spider)
 
@@ -179,6 +203,12 @@ class Engine:
             await outputs
             return None
         return self._transform(outputs)
+
+    async def _on_request_ignored(self, exc, request):
+        self.logger.debug(f"Request ignored: {request.url} ({exc.msg})")
+        self.crawler.stat_collector.inc_value('request_ignored_count')
+        await self.crawler.subscriber.notify(
+            event.ignore_request, exc, request, self.spider)
 
     async def enqueue_requests(self, request):
         await self._schedule_request(request)
@@ -198,10 +228,19 @@ class Engine:
     async def _get_next_request(self):
         return await self.scheduler.next_request()
 
-    async def _handle_spider_outputs(self, outputs):
+    async def _handle_spider_outputs(self, outputs, parent_request):
         from collections.abc import MutableMapping
+        depth_limit = self.settings.getint('DEPTH_LIMIT', 0)
+        parent_depth = parent_request.meta.get('depth', 0)
         async for output in outputs:
             if isinstance(output, Request):
+                output.meta.setdefault('depth', parent_depth + 1)
+                if depth_limit and output.meta['depth'] > depth_limit:
+                    self.crawler.stat_collector.inc_value('depth_limit/dropped')
+                    self.logger.debug(
+                        f"Dropped {output.url}: depth "
+                        f"{output.meta['depth']} > DEPTH_LIMIT {depth_limit}")
+                    continue
                 await self.processor.enqueue(output)
             elif isinstance(output, MutableMapping) and hasattr(output, 'FIELDS'):
                 # Item 实例（通过 MutableMapping 基类和 FIELDS 属性判断）
@@ -216,6 +255,8 @@ class Engine:
         # 修复逻辑：所有条件都必须满足才能退出
         if self.seed_task is not None and not self.seed_task.done():
             return False
+        if self.start_task is not None and not self.start_task.done():
+            return False
         if (self.scheduler.idle() and
             self.task_manager.all_done() and
             self.processor.idle() and
@@ -226,9 +267,10 @@ class Engine:
 
     async def close(self):
         self.running = False
-        if self.seed_task is not None and not self.seed_task.done():
-            self.seed_task.cancel()
-            await asyncio.gather(self.seed_task, return_exceptions=True)
+        for task in (self.seed_task, self.start_task):
+            if task is not None and not task.done():
+                task.cancel()
+                await asyncio.gather(task, return_exceptions=True)
         await self.__close(self.scheduler)
         await self.__close(self.processor)
         if self.task_manager.current_task:
