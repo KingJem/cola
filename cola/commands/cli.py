@@ -74,6 +74,52 @@ INIT_PY = '''"""
 '''
 
 
+PYPROJECT_TEMPLATE = '''[project]
+name = "{project_name}"
+version = "0.1.0"
+description = "Cola 爬虫项目"
+requires-python = ">=3.10"
+dependencies = [
+    "{cola_dep}",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.metadata]
+# 允许 cola @ file:// 本地路径依赖(colad 部署时 uv sync 需要)
+allow-direct-references = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["spiders"]
+'''
+
+
+def _detect_cola_source() -> str:
+    """推断 cola 依赖来源:优先本仓库源码路径(便于 colad 本机部署),
+    否则退回裸 'cola'(假设已发布/已安装)。"""
+    root = Path(__file__).resolve().parents[2]
+    if (root / 'cola' / '__init__.py').exists() and \
+            (root / 'pyproject.toml').exists():
+        return f'cola @ file://{root}'
+    return 'cola'
+
+
+def _cola_dependency(cola_source: str) -> str:
+    """把 --cola 参数规整成 pyproject 依赖串。
+    - 空:自动探测本地 cola 仓库
+    - 已存在的路径:cola @ file://<abs>
+    - 其它(含 == @ 等):原样当作依赖规格
+    """
+    if not cola_source:
+        return _detect_cola_source()
+    p = Path(cola_source).expanduser()
+    if p.exists():
+        return f'cola @ file://{p.resolve()}'
+    return cola_source
+
+
 README_TEMPLATE = '''# {project_name}
 
 Cola 爬虫项目
@@ -82,7 +128,7 @@ Cola 爬虫项目
 
 ```
 {project_name}/
-├── cola.py           # CLI 工具
+├── manage.py         # 本地运行器(python manage.py crawl <name>)
 ├── settings.py       # 项目配置
 ├── spiders/          # 爬虫目录
 ├── items/            # Item 定义
@@ -95,19 +141,19 @@ Cola 爬虫项目
 ### 创建爬虫
 
 ```bash
-python cola.py genspider example example.com
+python manage.py genspider example example.com
 ```
 
 ### 运行爬虫
 
 ```bash
-python cola.py crawl example
+python manage.py crawl example
 ```
 
 ### 列出所有爬虫
 
 ```bash
-python cola.py list
+python manage.py list
 ```
 
 ## 配置
@@ -153,16 +199,17 @@ def create_spider_in_project(spider_name: str, domain: str, project_dir: str = N
     print(f"  文件: spiders/{spider_name}.py")
     print(f"  域名: {domain}")
     print(f"\n运行爬虫:")
-    print(f"  python cola.py crawl {spider_name}")
+    print(f"  python manage.py crawl {spider_name}")
     
     return True
 
 
-def create_project(project_name: str, project_dir: str = None):
-    """创建新的 Cola 项目"""
+def create_project(project_name: str, project_dir: str = None,
+                   cola_source: str = ''):
+    """创建新的 Cola 项目(含 colad 可部署的 pyproject.toml)"""
     if project_dir is None:
         project_dir = os.getcwd()
-    
+
     project_path = Path(project_dir) / project_name
     
     # 检查项目是否已存在
@@ -193,18 +240,24 @@ def create_project(project_name: str, project_dir: str = None):
         SETTINGS_TEMPLATE.format(project_name=project_name)
     )
     
-    # 创建项目内的 cola.py CLI 脚本
+    # 创建项目内的 manage.py 运行器
     cli_content = generate_project_cli()
-    (project_path / 'cola.py').write_text(cli_content)
+    (project_path / 'manage.py').write_text(cli_content)
     
     # 创建 README.md
     readme_content = README_TEMPLATE.format(project_name=project_name)
     (project_path / 'README.md').write_text(readme_content)
+
+    # 创建 pyproject.toml（依赖 cola，供 colad 部署 uv sync 安装）
+    (project_path / 'pyproject.toml').write_text(
+        PYPROJECT_TEMPLATE.format(
+            project_name=project_name,
+            cola_dep=_cola_dependency(cola_source)))
     
     print(f"项目 '{project_name}' 创建成功!")
     print(f"\n目录结构:")
     print(f"  {project_name}/")
-    print(f"  ├── cola.py")
+    print(f"  ├── manage.py")
     print(f"  ├── settings.py")
     print(f"  ├── README.md")
     print(f"  ├── spiders/")
@@ -214,10 +267,13 @@ def create_project(project_name: str, project_dir: str = None):
     print(f"\n进入项目:")
     print(f"  cd {project_name}")
     print(f"\n创建爬虫:")
-    print(f"  python cola.py genspider <name> <domain>")
+    print(f"  python manage.py genspider <name> <domain>")
     print(f"\n运行爬虫:")
-    print(f"  python cola.py crawl <name>")
-    
+    print(f"  python manage.py crawl <name>")
+    print("")
+    print(f"colad 部署: colad deploy --master http://<master>:8080"
+          f" --name {project_name} --path . --runtime uv")
+
     return True
 
 
@@ -379,7 +435,7 @@ def cmd_genspider(args):
     print(f"  文件: spiders/{spider_name}.py")
     print(f"  域名: {domain}")
     print(f"\\n运行爬虫:")
-    print(f"  python cola.py crawl {spider_name}")
+    print(f"  python manage.py crawl {spider_name}")
 
 
 def main():
@@ -438,7 +494,7 @@ def run_crawl(spider_name: str, project_dir: str = None, concurrent: int = None,
         return False
     
     # 构建命令
-    cmd = [sys.executable, 'cola.py', 'crawl', spider_name]
+    cmd = [sys.executable, 'manage.py', 'crawl', spider_name]
     if concurrent:
         cmd.extend(['-c', str(concurrent)])
     if log_level:
@@ -722,6 +778,9 @@ def main():
         help='创建新的 Cola 项目'
     )
     startproject_parser.add_argument('project', help='项目名称')
+    startproject_parser.add_argument(
+        '--cola', default='',
+        help='cola 依赖来源:本地路径或版本规格,默认自动探测本仓库')
     
     # genspider 命令
     genspider_parser = subparsers.add_parser(
@@ -781,7 +840,7 @@ def main():
     args = parser.parse_args()
     
     if args.command == 'startproject':
-        create_project(args.project)
+        create_project(args.project, cola_source=args.cola)
     elif args.command == 'genspider':
         create_spider(args.name, args.domain)
     elif args.command == 'crawl':
