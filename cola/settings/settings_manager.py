@@ -78,6 +78,15 @@ class SettingsManager(MutableMapping):
             return value.split(',')
         return list(value)
 
+    def getdict(self, key, default=None):
+        value = self.get(key, default)
+        if value is None:
+            return {}
+        if isinstance(value, str):
+            import json
+            return json.loads(value)
+        return dict(value)
+
     def set_setting(self, module, priority=PRIORITY_PROJECT):
         if isinstance(module, str):
             module = importlib.import_module(module)

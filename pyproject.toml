@@ -1,6 +1,6 @@
 [project]
 name = "cola"
-version = "0.1.0"
+version = "0.1.1"
 description = "A high-performance async Python web scraping framework"
 authors = [
     {name = "KingJem", email = "qqqqivy@gmail.com"}

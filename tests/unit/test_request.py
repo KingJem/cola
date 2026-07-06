@@ -14,7 +14,7 @@ class TestRequestBasics:
         assert req.url == 'https://example.com'
         assert req.method == 'GET'
         assert req.priority == 0
-        assert req.headers is None
+        assert req.headers == {}   # headers 始终为 dict
         assert req.cookies is None
         assert req.proxy is None
         assert req.body is None
@@ -148,9 +148,9 @@ class TestRequestHeaders:
     """Test Request headers handling."""
     
     def test_headers_none(self):
-        """Test request with no headers."""
+        """未传 headers 时为空 dict(便于中间件合并)。"""
         req = Request(url='https://example.com')
-        assert req.headers is None
+        assert req.headers == {}
     
     def test_headers_dict(self):
         """Test request with headers dict."""

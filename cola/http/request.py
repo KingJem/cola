@@ -17,7 +17,8 @@ class Request:
                  meta: dict = None,
                  ):
         self.url = url
-        self.headers = headers
+        # 始终为 dict,便于中间件 setdefault 合并请求头
+        self.headers = dict(headers) if headers else {}
         self.priority = priority
         self.method = method.upper()
         self.cookies = cookies
