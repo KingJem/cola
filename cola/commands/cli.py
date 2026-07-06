@@ -541,7 +541,7 @@ def cmd_version(args):
     """显示 Cola 版本信息"""
     try:
         import cola
-        cola_version = getattr(src, '__version__', 'unknown')
+        cola_version = getattr(cola, '__version__', 'unknown')
     except ImportError:
         cola_version = "unknown"
     
