@@ -643,114 +643,107 @@ def cmd_settings(args):
 
 
 def cmd_bench(args):
-    """运行快速基准测试"""
-    import time
+    """并发/吞吐基准:内置本地 mock 服务器 + 真实引擎全速爬,报 pages/min。
+
+    与 scrapy bench 对齐——离线、可复现,测的是引擎调度与并发吞吐,而非外网。
+    每个 mock 页面生成 FANOUT 个链接;BenchSpider 爬满 --pages 个响应后停止
+    产生新链接,引擎在队列耗尽后自然退出。
+    """
     import asyncio
-    from cola.http.request import Request
-    from cola.http.response import Response
-    from cola.settings.settings_manager import SettingsManager
-    from cola.downloaders.aio_http_downloader import AioHttpDownloader
-    from cola.stats_collector import StatsCollector
+    import time
     from datetime import datetime
-    
+
+    from aiohttp import web
+
+    from cola.crawler import CrawlerProcess
+    from cola.settings.settings_manager import SettingsManager
+    from cola.spiders import Spider
+    from cola.http.request import Request
+
     concurrent = args.concurrent
-    total_requests = args.requests
-    test_url = 'https://httpbin.org/get'
-    
-    class BenchCrawler:
-        def __init__(self, settings):
-            self.settings = settings
-            self.spider = None
-            self.stat_collector = StatsCollector(settings)
-            self.pipeline_manager = None
-    
-    settings = SettingsManager({
-        'CONCURRENT_REQUESTS': concurrent,
-    })
-    crawler = BenchCrawler(settings)
-    crawler.stat_collector['start_time'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    
-    print(f"Cola Benchmark")
-    print(f"=" * 60)
-    print(f"Target URL: {test_url}")
+    max_pages = args.pages
+    fanout = 8
+
+    print("Cola Benchmark(内置 mock server + 真实引擎)")
+    print("=" * 60)
     print(f"Concurrent requests: {concurrent}")
-    print(f"Total requests: {total_requests}")
-    print(f"")
-    print(f"Running benchmark...")
-    print(f"")
-    
+    print(f"Target pages:        {max_pages}")
+    print(f"Link fanout/page:    {fanout}")
+    print("")
+    print("Running benchmark...")
+    print("")
+
+    class BenchSpider(Spider):
+        start_urls = ['__PLACEHOLDER__']
+
+        def __init__(self):
+            super().__init__()
+            self._scheduled = 0
+
+        async def parse(self, response):
+            data = response.json()
+            yield {'page': data['page']}
+            # 爬满目标页数前持续产生链接,喂饱引擎
+            if self._scheduled < max_pages:
+                for link in data['links']:
+                    self._scheduled += 1
+                    yield Request(url=link, callback=self.parse)
+
     async def run():
-        downloader = AioHttpDownloader(crawler)
-        downloader.open()
-        
-        semaphore = asyncio.Semaphore(concurrent)
-        latencies = []
-        errors = 0
-        start_time = time.time()
-        
-        async def fetch_one(url):
-            nonlocal errors
-            req = Request(url=url)
-            t0 = time.time()
-            try:
-                resp = await downloader.fetch(req)
-                latency = time.time() - t0
-                latencies.append(latency)
-                if resp:
-                    crawler.stat_collector.inc_value('response_count', 1)
-                else:
-                    errors += 1
-            except Exception:
-                errors += 1
-                crawler.stat_collector.inc_value('error_count', 1)
-            finally:
-                semaphore.release()
-        
-        tasks = []
-        for i in range(total_requests):
-            await semaphore.acquire()
-            task = asyncio.create_task(fetch_one(test_url))
-            tasks.append(task)
-        
-        await asyncio.gather(*tasks, return_exceptions=True)
-        elapsed = time.time() - start_time
-        
-        await downloader.close()
-        return elapsed, latencies, errors
-    
-    elapsed, latencies, errors = asyncio.run(run())
-    
-    crawler.stat_collector['end_time'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    
-    success = len(latencies)
-    if latencies:
-        latencies.sort()
-        avg_lat = sum(latencies) / len(latencies)
-        min_lat = latencies[0]
-        max_lat = latencies[-1]
-        p50_lat = latencies[len(latencies) // 2]
-        p95_lat = latencies[int(len(latencies) * 0.95)]
-        p99_lat = latencies[int(len(latencies) * 0.99)]
-    
-    print(f"=" * 60)
-    print(f"Benchmark Results")
-    print(f"-" * 60)
-    print(f"Total time:       {elapsed:.3f}s")
-    print(f"Requests made:    {total_requests}")
-    print(f"Successful:      {success}")
-    print(f"Errors:          {errors}")
-    print(f"Req/sec:         {total_requests / elapsed:.2f}")
-    if latencies:
-        print(f"")
-        print(f"Latency (seconds):")
-        print(f"  avg:    {avg_lat:.3f}s")
-        print(f"  min:    {min_lat:.3f}s")
-        print(f"  max:    {max_lat:.3f}s")
-        print(f"  p50:    {p50_lat:.3f}s")
-        print(f"  p95:    {p95_lat:.3f}s")
-        print(f"  p99:    {p99_lat:.3f}s")
-    print(f"=" * 60)
-    
+        # 1) 起本地 mock server
+        async def page(request):
+            n = int(request.match_info['n'])
+            base = f"http://{request.host}"
+            links = [f"{base}/{n * fanout + i}" for i in range(1, fanout + 1)]
+            return web.json_response({'page': n, 'links': links})
+
+        app = web.Application()
+        app.router.add_get('/{n}', page)
+        runner = web.AppRunner(app, access_log=None)
+        await runner.setup()
+        site = web.TCPSite(runner, '127.0.0.1', 0)
+        await site.start()
+        port = site._server.sockets[0].getsockname()[1]
+        BenchSpider.start_urls = [f'http://127.0.0.1:{port}/1']
+
+        settings = SettingsManager({
+            'PROJECT_NAME': 'bench',
+            'CONCURRENT_REQUESTS': concurrent,
+            'LOG_LEVEL': 'WARNING',
+            'EXTENSIONS': ['cola.extension.log_stats.LogStats'],
+        })
+        process = CrawlerProcess(settings)
+        crawler = process.create_crawler(BenchSpider)
+        process.crawlers.add(crawler)
+
+        t0 = time.time()
+        await crawler.crawl()
+        elapsed = time.time() - t0
+
+        await runner.cleanup()
+        return elapsed, crawler.stat_collector
+
+    elapsed, stats = asyncio.run(run())
+
+    pages = stats.get_value('response_received_count', 0)
+    items = stats.get_value('item_successful_count', 0)
+    req_time = stats.get_value('downloader/response_time_total', 0.0)
+    req_count = stats.get_value('downloader/request_count', 0)
+    avg_lat = (req_time / req_count) if req_count else 0.0
+
+    print("=" * 60)
+    print("Benchmark Results")
+    print("-" * 60)
+    print(f"Elapsed:          {elapsed:.3f}s")
+    print(f"Pages crawled:    {pages}")
+    print(f"Items scraped:    {items}")
+    if elapsed > 0:
+        print(f"Pages/min:        {pages / elapsed * 60:.0f}")
+        print(f"Pages/sec:        {pages / elapsed:.1f}")
+    print(f"Avg download:     {avg_lat * 1000:.1f}ms")
+    print(f"Concurrency:      {concurrent}")
+    print("=" * 60)
+
     return 0
 
 
@@ -837,7 +830,7 @@ def main():
         help='运行快速基准测试'
     )
     bench_parser.add_argument('--concurrent', type=int, default=16, help='并发请求数 (默认: 16)')
-    bench_parser.add_argument('--requests', type=int, default=100, help='总请求数 (默认: 100)')
+    bench_parser.add_argument('--pages', type=int, default=200, help='目标爬取页数 (默认: 200)')
     
     from cola.commands import extra
     extra.add_commands(subparsers)
