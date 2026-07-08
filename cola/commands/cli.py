@@ -354,10 +354,12 @@ def cmd_crawl(args):
         try:
             module = importlib.import_module(module_name)
             for name, obj in module.__dict__.items():
-                if (isinstance(obj, type) and 
-                    issubclass(obj, Spider) and 
-                    obj is not Spider and
-                    name.lower() == spider_name.lower()):
+                if not (isinstance(obj, type) and issubclass(obj, Spider)
+                        and obj is not Spider):
+                    continue
+                sname = getattr(obj, 'name', None)
+                sname = sname if isinstance(sname, str) else name
+                if sname.lower() == spider_name.lower() or                         name.lower() == spider_name.lower():
                     spider_class = obj
                     break
         except Exception as e:
@@ -837,6 +839,9 @@ def main():
     bench_parser.add_argument('--concurrent', type=int, default=16, help='并发请求数 (默认: 16)')
     bench_parser.add_argument('--requests', type=int, default=100, help='总请求数 (默认: 100)')
     
+    from cola.commands import extra
+    extra.add_commands(subparsers)
+
     args = parser.parse_args()
     
     if args.command == 'startproject':
@@ -855,6 +860,8 @@ def main():
         cmd_settings(args)
     elif args.command == 'bench':
         cmd_bench(args)
+    elif extra.handle(args):
+        pass
     else:
         parser.print_help()
 
