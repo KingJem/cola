@@ -21,6 +21,7 @@ from loguru import logger
 from cola.crawler import CrawlerProcess
 from cola.settings.settings_manager import SettingsManager
 from cola.spiders import Spider
+from cola.utils.loop import install_event_loop
 
 
 def discover_spiders(project_dir: str) -> dict:
@@ -92,6 +93,7 @@ def main(argv=None):
             f"未找到爬虫 {args.spider!r},可用: {sorted(spiders)}")
 
     settings = load_settings(args)
+    install_event_loop(settings.get('EVENT_LOOP'))
     logger.info(f"Runner starting spider {args.spider} "
                 f"(project_dir={args.project_dir})")
     asyncio.run(run(spider_cls, settings))

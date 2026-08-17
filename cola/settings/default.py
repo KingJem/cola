@@ -10,6 +10,9 @@ CONCURRENT_REQUESTS = 16
 
 DOWNLOADER_CLASS = 'cola.downloaders.aio_http_downloader.AioHttpDownloader'
 
+# 事件循环:asyncio | uvloop(pip install cola[uvloop];Windows/未装自动回退)
+EVENT_LOOP = 'asyncio'
+
 VERIFY_SSL = False
 
 TIMEOUT = 30

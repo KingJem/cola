@@ -86,6 +86,8 @@ def cmd_runspider(args):
         print(f"错误: {args.spider_file} 中未找到 Spider 子类")
         return 1
     settings = SettingsManager(_parse_set(args.set))
+    from cola.utils.loop import install_event_loop
+    install_event_loop(settings.get('EVENT_LOOP'))
 
     async def run():
         process = CrawlerProcess(settings)

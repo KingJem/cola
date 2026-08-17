@@ -1,6 +1,6 @@
 [project]
 name = "cola"
-version = "0.1.1"
+version = "0.1.2"
 description = "A high-performance async Python web scraping framework"
 authors = [
     {name = "KingJem", email = "qqqqivy@gmail.com"}
@@ -19,6 +19,10 @@ dependencies = [
 redis = [
     "redis>=5.0.0",
 ]
+uvloop = [
+    # 事件循环加速(高并发 +15~27%);Windows 不支持
+    "uvloop>=0.21.0; sys_platform != 'win32'",
+]
 mysql = [
     "aiomysql>=0.2.0",
     # MySQL 8+ 默认 caching_sha2_password 认证需要
@@ -36,6 +40,7 @@ all = [
     "cryptography>=42.0.0",
     "asyncpg>=0.29.0",
     "aio-pika>=9.4.0",
+    "uvloop>=0.21.0; sys_platform != 'win32'",
 ]
 dev = [
     "pytest>=7.4.0",

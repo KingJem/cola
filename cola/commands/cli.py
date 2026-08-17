@@ -664,8 +664,12 @@ def cmd_bench(args):
     max_pages = args.pages
     fanout = 8
 
+    from cola.utils.loop import install_event_loop
+    active_loop = install_event_loop(getattr(args, 'loop', None))
+
     print("Cola Benchmark(内置 mock server + 真实引擎)")
     print("=" * 60)
+    print(f"Event loop:          {active_loop}")
     print(f"Concurrent requests: {concurrent}")
     print(f"Target pages:        {max_pages}")
     print(f"Link fanout/page:    {fanout}")
@@ -831,6 +835,8 @@ def main():
     )
     bench_parser.add_argument('--concurrent', type=int, default=16, help='并发请求数 (默认: 16)')
     bench_parser.add_argument('--pages', type=int, default=200, help='目标爬取页数 (默认: 200)')
+    bench_parser.add_argument('--loop', choices=['asyncio', 'uvloop'], default='asyncio',
+                              help='事件循环实现 (默认: asyncio)')
     
     from cola.commands import extra
     extra.add_commands(subparsers)
